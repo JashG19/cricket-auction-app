@@ -1,29 +1,29 @@
-import { Navigate } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuth'
-import { Loading } from './Loading'
+import { Navigate } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
+import { Loading } from "./Loading";
 
 export const AuthGate = ({ children, requireAdmin = false }) => {
-  const { user, loading, isAdmin } = useAuth()
+  const { user, loading, isAdmin } = useAuth();
 
   if (loading) {
-    return <Loading message="Authenticating..." />
+    return <Loading message="Authenticating..." />;
   }
 
   if (requireAdmin && !isAdmin) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/login" replace />;
   }
 
-  return children
-}
+  return children;
+};
 
 export const PublicRoute = ({ children }) => {
-  const { user, loading } = useAuth()
+  const { user, loading } = useAuth();
 
   if (loading) {
-    return <Loading message="Loading..." />
+    return <Loading message="Loading..." />;
   }
 
-  return children
-}
+  return children;
+};
 
-export default AuthGate
+export default AuthGate;

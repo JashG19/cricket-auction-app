@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { IoClose } from 'react-icons/io5'
+import { useState } from "react";
+import { IoClose } from "react-icons/io5";
 
 export const Modal = ({
   isOpen,
@@ -8,11 +8,11 @@ export const Modal = ({
   onClose,
   onConfirm,
   onCancel,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
+  confirmText = "Confirm",
+  cancelText = "Cancel",
   isDanger = false,
 }) => {
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -29,9 +29,7 @@ export const Modal = ({
         </div>
 
         {/* Content */}
-        <div className="p-6">
-          {children}
-        </div>
+        <div className="p-6">{children}</div>
 
         {/* Footer */}
         {(onConfirm || onCancel) && (
@@ -47,7 +45,7 @@ export const Modal = ({
             {onConfirm && (
               <button
                 onClick={onConfirm}
-                className={`px-4 py-2 rounded text-white transition ${isDanger ? 'bg-danger hover:bg-red-700' : 'bg-primary hover:bg-accent'}`}
+                className={`px-4 py-2 rounded text-white transition ${isDanger ? "bg-danger hover:bg-red-700" : "bg-primary hover:bg-accent"}`}
               >
                 {confirmText}
               </button>
@@ -56,7 +54,7 @@ export const Modal = ({
         )}
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Modal
+export default Modal;

@@ -1,6 +1,6 @@
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
 
 * {
   margin: 0;
@@ -13,7 +13,7 @@ html {
 }
 
 body {
-  font-family: 'system-ui', 'Avenir', 'Helvetica', 'Arial', sans-serif;
+  font-family: "system-ui", "Avenir", "Helvetica", "Arial", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #f8f9fa;
@@ -47,7 +47,8 @@ body {
 }
 
 @keyframes pulse-bid {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
   50% {

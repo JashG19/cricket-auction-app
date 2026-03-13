@@ -5,6 +5,7 @@ A comprehensive cricket auction management application built with React, Firebas
 ## Features
 
 ### Admin Panel
+
 - **Auction Setup**: Create auctions, add teams, define groups with custom bid increments
 - **Player Management**: Add/edit/delete players, assign groups, upload photos
 - **Live Bidding Control**: Increment bids, manage bid history, undo bids, select winners
@@ -12,6 +13,7 @@ A comprehensive cricket auction management application built with React, Firebas
 - **Results & Export**: Export final squads and auction results to CSV/Excel
 
 ### Viewer Panel
+
 - **Live Auction Dashboard**: Real-time bid display, team squad building, budget tracking
 - **Player Information**: View player photos, age, group, stats
 - **Team Status**: Monitor team budgets and squad formation
@@ -29,6 +31,7 @@ A comprehensive cricket auction management application built with React, Firebas
 ## Getting Started
 
 ### Prerequisites
+
 - Node.js (v16+)
 - npm or yarn
 - Firebase account (free tier works)
@@ -36,11 +39,13 @@ A comprehensive cricket auction management application built with React, Firebas
 ### Installation
 
 1. **Clone or navigate to the project**
+
    ```bash
    cd cricket-auction-app
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
@@ -56,10 +61,13 @@ A comprehensive cricket auction management application built with React, Firebas
 4. **Configure Environment Variables**
    - Copy `.env.example` to `.env.local`
    - Update with your Firebase credentials
+
    ```bash
    cp .env.example .env.local
    ```
+
    - Edit `.env.local` and add your Firebase config values:
+
    ```
    VITE_FIREBASE_API_KEY=your_api_key
    VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain
@@ -173,6 +181,7 @@ auction_players/ (Live state)
 ## Firebase Security Rules
 
 Configure Firestore rules to:
+
 - Allow admin (authenticated) to read/write all data
 - Allow viewers (unauthenticated) to read-only auction data
 - Restrict player/auction modifications to admin only
@@ -182,16 +191,19 @@ Configure Firestore rules to:
 ### Deploy to Firebase Hosting
 
 1. **Install Firebase CLI**
+
    ```bash
    npm install -g firebase-tools
    ```
 
 2. **Login to Firebase**
+
    ```bash
    firebase login
    ```
 
 3. **Build for Production**
+
    ```bash
    npm run build
    ```
@@ -204,6 +216,7 @@ Configure Firestore rules to:
 ### Deploy to Vercel
 
 1. **Push to GitHub**
+
    ```bash
    git init
    git add .
@@ -239,16 +252,19 @@ Configure Firestore rules to:
 ## Troubleshooting
 
 ### Firebase Connection Issues
+
 - Verify `.env.local` has correct Firebase credentials
 - Check Firebase project has Realtime Database enabled
 - Ensure database security rules allow your operations
 
 ### Real-time Updates Not Working
+
 - Check browser console for Firebase errors
 - Verify Firebase listeners are active
 - Check network tab in DevTools for Firestore calls
 
 ### Build Issues
+
 - Clear `node_modules` and reinstall: `rm -rf node_modules && npm install`
 - Clear Vite cache: `rm -rf dist && npm run build`
 

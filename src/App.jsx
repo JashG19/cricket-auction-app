@@ -1,9 +1,13 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { Home } from './pages/Home'
-import { LoginPage } from './pages/LoginPage'
-import { NotFound } from './pages/NotFound'
-import { AuthGate } from './components/AuthGate'
-import './App.css'
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Home } from "./pages/Home";
+import { LoginPage } from "./pages/LoginPage";
+import { NotFound } from "./pages/NotFound";
+import { AdminSetup } from "./pages/admin/AdminSetup";
+import { AdminPlayers } from "./pages/admin/AdminPlayers";
+import { AdminLive } from "./pages/admin/AdminLive";
+import { AdminResults } from "./pages/admin/AdminResults";
+import { AuthGate } from "./components/AuthGate";
+import "./App.css";
 
 function App() {
   return (
@@ -13,14 +17,12 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<LoginPage />} />
 
-        {/* Admin Routes (placeholder for now) */}
+        {/* Admin Routes */}
         <Route
           path="/admin/setup"
           element={
             <AuthGate requireAdmin>
-              <div className="min-h-screen flex items-center justify-center">
-                <h1 className="text-4xl font-bold">Admin Setup - Coming Soon</h1>
-              </div>
+              <AdminSetup />
             </AuthGate>
           }
         />
@@ -28,29 +30,23 @@ function App() {
           path="/admin/players"
           element={
             <AuthGate requireAdmin>
-              <div className="min-h-screen flex items-center justify-center">
-                <h1 className="text-4xl font-bold">Player Management - Coming Soon</h1>
-              </div>
+              <AdminPlayers />
             </AuthGate>
           }
         />
         <Route
-          path="/admin/live"
+          path="/admin/live/:auctionId"
           element={
             <AuthGate requireAdmin>
-              <div className="min-h-screen flex items-center justify-center">
-                <h1 className="text-4xl font-bold">Live Auction - Coming Soon</h1>
-              </div>
+              <AdminLive />
             </AuthGate>
           }
         />
         <Route
-          path="/admin/results"
+          path="/admin/results/:auctionId"
           element={
             <AuthGate requireAdmin>
-              <div className="min-h-screen flex items-center justify-center">
-                <h1 className="text-4xl font-bold">Results & Export - Coming Soon</h1>
-              </div>
+              <AdminResults />
             </AuthGate>
           }
         />
@@ -60,7 +56,9 @@ function App() {
           path="/auction/:auctionId"
           element={
             <div className="min-h-screen flex items-center justify-center">
-              <h1 className="text-4xl font-bold">Auction Dashboard - Coming Soon</h1>
+              <h1 className="text-4xl font-bold">
+                Auction Dashboard - Coming Soon
+              </h1>
             </div>
           }
         />
@@ -85,7 +83,7 @@ function App() {
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Router>
-  )
+  );
 }
 
-export default App
+export default App;
