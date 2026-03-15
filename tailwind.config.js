@@ -21,11 +21,21 @@ export default {
       },
       animation: {
         "pulse-bid": "pulse-bid 0.6s ease-in-out",
+        "fade-in-up": "fadeInUp 0.4s ease-out",
+        "count-up": "countUp 0.3s ease-out",
       },
       keyframes: {
         "pulse-bid": {
           "0%, 100%": { transform: "scale(1)" },
           "50%": { transform: "scale(1.05)" },
+        },
+        fadeInUp: {
+          "0%": { opacity: "0", transform: "translateY(16px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        countUp: {
+          "0%": { transform: "translateY(8px)", opacity: "0" },
+          "100%": { transform: "translateY(0)", opacity: "1" },
         },
       },
     },

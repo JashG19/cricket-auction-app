@@ -29,7 +29,7 @@ export const LoginPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary to-darkBg flex items-center justify-center px-4">
-      <div className="bg-white rounded-lg shadow-2xl p-8 max-w-md w-full">
+      <div className="bg-white rounded-lg shadow-2xl p-8 max-w-md w-full animate-fade-in-up">
         <h1 className="text-3xl font-bold text-primary text-center mb-2">
           Cricket Auction
         </h1>

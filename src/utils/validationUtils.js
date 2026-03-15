@@ -15,8 +15,14 @@ export const validateAuctionSetup = (auctionData) => {
     errors.maxPlayers = "Max players must be greater than 0";
   }
 
-  if (auctionData.date && new Date(auctionData.date) < new Date()) {
-    errors.date = "Auction date cannot be in the past";
+  if (auctionData.date) {
+    const selectedDate = new Date(auctionData.date);
+    const today = new Date();
+    selectedDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    if (selectedDate < today) {
+      errors.date = "Auction date cannot be in the past";
+    }
   }
 
   return Object.keys(errors).length === 0 ? null : errors;
@@ -55,7 +61,7 @@ export const validateGroup = (groupData) => {
     errors.increment_value = "Increment value must be greater than 0";
   }
 
-  if (groupData.max_bid_cap && groupData.max_bid_cap <= 0) {
+  if (groupData.max_bid_cap !== "" && groupData.max_bid_cap !== undefined && groupData.max_bid_cap !== null && Number(groupData.max_bid_cap) <= 0) {
     errors.max_bid_cap = "Max bid cap must be greater than 0";
   }
 

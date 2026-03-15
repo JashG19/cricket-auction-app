@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   IoCheckmarkCircle,
   IoClose,
@@ -13,15 +13,22 @@ export const Toast = ({
   onClose,
 }) => {
   const [isVisible, setIsVisible] = useState(true);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsVisible(false);
-      onClose && onClose();
+      onCloseRef.current?.();
     }, duration);
 
     return () => clearTimeout(timer);
-  }, [duration, onClose]);
+  }, [duration]);
+
+  const handleClose = () => {
+    setIsVisible(false);
+    onCloseRef.current?.();
+  };
 
   if (!isVisible) return null;
 
@@ -41,12 +48,12 @@ export const Toast = ({
 
   return (
     <div
-      className={`fixed bottom-4 right-4 border rounded-lg p-4 flex items-center gap-3 shadow-lg animate-slideIn ${typeStyles[type]}`}
+      className={`border rounded-lg p-4 flex items-center gap-3 shadow-lg animate-slideIn ${typeStyles[type]}`}
     >
       <div className="text-xl">{iconStyles[type]}</div>
       <span className="flex-1 font-medium">{message}</span>
       <button
-        onClick={() => setIsVisible(false)}
+        onClick={handleClose}
         className="text-lg hover:opacity-70 transition"
       >
         <IoClose />
@@ -55,19 +62,20 @@ export const Toast = ({
   );
 };
 
+let toastCounter = 0;
+
 export const useToast = () => {
   const [toasts, setToasts] = useState([]);
 
-  const showToast = (message, type = "success", duration = 4000) => {
-    const id = Date.now();
+  const showToast = useCallback((message, type = "success", duration = 4000) => {
+    const id = ++toastCounter;
     setToasts((prev) => [...prev, { id, message, type, duration }]);
-
     return id;
-  };
+  }, []);
 
-  const removeToast = (id) => {
+  const removeToast = useCallback((id) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  };
+  }, []);
 
   return {
     toasts,

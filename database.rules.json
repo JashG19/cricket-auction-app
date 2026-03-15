@@ -4,6 +4,9 @@
       // Anyone can read auction data (viewers need this)
       ".read": true,
 
+      // Only authenticated admin can create new auctions
+      ".write": "auth != null && auth.token.email === 'jashgandhi46@gmail.com'",
+
       "$auctionId": {
         // Only authenticated admin can write auction data
         ".write": "auth != null && auth.token.email === 'jashgandhi46@gmail.com'",
@@ -23,8 +26,18 @@
         "bidding": {
           ".read": true,
           ".write": "auth != null && auth.token.email === 'jashgandhi46@gmail.com'"
+        },
+        "live_state": {
+          ".read": true,
+          ".write": "auth != null && auth.token.email === 'jashgandhi46@gmail.com'"
         }
       }
+    },
+
+    // Deny access to everything else
+    "$other": {
+      ".read": false,
+      ".write": false
     }
   }
 }

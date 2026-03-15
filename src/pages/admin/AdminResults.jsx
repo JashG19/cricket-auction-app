@@ -6,9 +6,10 @@ import { ToastContainer } from "../../components/ToastContainer";
 import {
   exportToCSV,
   exportToExcel,
+  exportToPDF,
 } from "../../utils/exportUtils";
 import { firebaseObjectToArray, createLookupMap, calculateSpentBudget } from "../../utils/dataTransformUtils";
-import { IoDownload, IoArrowBack } from "react-icons/io5";
+import { IoDownload, IoArrowBack, IoDocument } from "react-icons/io5";
 
 export const AdminResults = () => {
   const { auctionId } = useParams();
@@ -29,20 +30,29 @@ export const AdminResults = () => {
 
   // Calculate stats
   const totalPlayers = playersList.length;
-  const soldPlayers = playersList.filter((p) => p.soldPrice).length;
-  const unsoldPlayers = totalPlayers - soldPlayers;
+  const soldPlayers = playersList.filter((p) => p.soldTo).length;
+  const unsoldPlayers = playersList.filter((p) => p.unsold && !p.soldTo).length;
+  const pendingPlayers = totalPlayers - soldPlayers - unsoldPlayers;
   const totalSpent = teamsList.reduce(
     (sum, team) => sum + calculateSpentBudget(team),
     0,
   );
 
-  // Shared: enrich players with group name for export
+  const teamsById = useMemo(() => createLookupMap(teamsList), [teamsList]);
+
+  // Shared: enrich players with group name, base_price, and team name for export
   const playersWithGroup = useMemo(() =>
-    playersList.map((p) => ({
-      ...p,
-      group_name: groupsById.get(String(p.group_id))?.group_name || "N/A",
-    })),
-    [playersList, groupsById],
+    playersList.map((p) => {
+      const group = groupsById.get(String(p.group_id));
+      const team = p.soldTo ? teamsById.get(String(p.soldTo)) : null;
+      return {
+        ...p,
+        group_name: group?.group_name || "N/A",
+        base_price: group?.base_price || 0,
+        team_name: team?.team_name || (p.soldTo ? "Unknown" : "-"),
+      };
+    }),
+    [playersList, groupsById, teamsById],
   );
 
   // Export functions
@@ -72,64 +82,78 @@ export const AdminResults = () => {
     }
   };
 
+  const handleExportPDF = () => {
+    try {
+      exportToPDF(
+        auctionData,
+        teamsList,
+        playersWithGroup,
+        `${auctionData?.name || "auction"}_results.pdf`,
+      );
+      showToast("PDF exported successfully!", "success");
+    } catch (error) {
+      showToast(`Error exporting PDF: ${error.message}`, "error");
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-lightBg p-6">
+    <div className="min-h-screen bg-lightBg p-3 sm:p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-4xl font-bold text-primary">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6 sm:mb-8">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-4xl font-bold text-primary truncate">
               {auctionData?.name} - Results
             </h1>
-            <p className="text-textLight">Auction Summary & Export</p>
+            <p className="text-textLight text-sm">Auction Summary & Export</p>
           </div>
           <button
             onClick={() => navigate(-1)}
-            className="btn btn-secondary flex items-center gap-2"
+            className="btn btn-sm btn-secondary flex items-center gap-2 self-start sm:self-auto"
           >
-            <IoArrowBack size={20} /> Back
+            <IoArrowBack size={18} /> Back
           </button>
         </div>
 
         {/* Summary Cards */}
-        <div className="grid md:grid-cols-4 gap-4 mb-8">
-          <div className="card text-center">
-            <p className="text-textLight mb-2">Total Teams</p>
-            <p className="text-4xl font-bold text-primary">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+          <div className="card card-hover text-center p-4">
+            <p className="text-textLight text-xs sm:text-base mb-1 sm:mb-2">Total Teams</p>
+            <p className="text-2xl sm:text-4xl font-bold text-primary">
               {teamsList.length}
             </p>
           </div>
-          <div className="card text-center">
-            <p className="text-textLight mb-2">Total Players</p>
-            <p className="text-4xl font-bold text-primary">{totalPlayers}</p>
+          <div className="card card-hover text-center p-4">
+            <p className="text-textLight text-xs sm:text-base mb-1 sm:mb-2">Total Players</p>
+            <p className="text-2xl sm:text-4xl font-bold text-primary">{totalPlayers}</p>
           </div>
-          <div className="card text-center">
-            <p className="text-textLight mb-2">Sold Players</p>
-            <p className="text-4xl font-bold text-secondary">{soldPlayers}</p>
+          <div className="card card-hover text-center p-4">
+            <p className="text-textLight text-xs sm:text-base mb-1 sm:mb-2">Sold Players</p>
+            <p className="text-2xl sm:text-4xl font-bold text-secondary">{soldPlayers}</p>
           </div>
-          <div className="card text-center">
-            <p className="text-textLight mb-2">Unsold Players</p>
-            <p className="text-4xl font-bold text-danger">{unsoldPlayers}</p>
+          <div className="card card-hover text-center p-4">
+            <p className="text-textLight text-xs sm:text-base mb-1 sm:mb-2">Unsold Players</p>
+            <p className="text-2xl sm:text-4xl font-bold text-danger">{unsoldPlayers}</p>
           </div>
         </div>
 
         {/* Total Amount */}
-        <div className="card mb-8 bg-gradient-to-r from-primary to-accent p-8">
-          <p className="text-white text-lg mb-2">Total Amount Spent</p>
-          <p className="text-5xl font-bold text-secondary">
+        <div className="card mb-6 sm:mb-8 bg-gradient-to-r from-primary to-accent p-4 sm:p-8">
+          <p className="text-white text-base sm:text-lg mb-2">Total Amount Spent</p>
+          <p className="text-3xl sm:text-5xl font-bold text-secondary">
             ₹{totalSpent.toLocaleString()}
           </p>
-          <p className="text-white text-sm mt-3">
+          <p className="text-white text-sm mt-2 sm:mt-3">
             Purse: ₹{(auctionData?.purse_size || 0).toLocaleString()}
           </p>
         </div>
 
         {/* Export Buttons */}
-        <div className="card mb-8">
-          <h2 className="text-2xl font-bold text-primary mb-6">
+        <div className="card mb-6 sm:mb-8 p-4 sm:p-6">
+          <h2 className="text-xl sm:text-2xl font-bold text-primary mb-4 sm:mb-6">
             Export Results
           </h2>
-          <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <button
               onClick={handleExportCSV}
               className="btn btn-primary flex-1 flex items-center justify-center gap-2 btn-lg"
@@ -142,16 +166,22 @@ export const AdminResults = () => {
             >
               <IoDownload size={20} /> Export as Excel
             </button>
+            <button
+              onClick={handleExportPDF}
+              className="btn btn-danger flex-1 flex items-center justify-center gap-2 btn-lg"
+            >
+              <IoDocument size={20} /> Export as PDF
+            </button>
           </div>
         </div>
 
         {/* Team-wise Summary */}
-        <div className="card mb-8">
-          <h2 className="text-2xl font-bold text-primary mb-6">
+        <div className="card mb-6 sm:mb-8 p-4 sm:p-6">
+          <h2 className="text-xl sm:text-2xl font-bold text-primary mb-4 sm:mb-6">
             Team-wise Summary
           </h2>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full table-improved">
               <thead>
                 <tr className="border-b-2 border-border">
                   <th className="text-left py-4 px-4 font-bold text-primary">
@@ -177,7 +207,7 @@ export const AdminResults = () => {
               <tbody>
                 {teamsList.map((team) => {
                   const spent = calculateSpentBudget(team);
-                  const spentPercent = (spent / team.budget_total) * 100;
+                  const spentPercent = Number(team.budget_total) > 0 ? (spent / Number(team.budget_total)) * 100 : 0;
                   return (
                     <tr
                       key={team.id}
@@ -202,7 +232,7 @@ export const AdminResults = () => {
                         <div className="w-32 bg-gray-200 rounded-full h-2">
                           <div
                             className="bg-secondary h-2 rounded-full"
-                            style={{ width: `${spentPercent}%` }}
+                            style={{ width: `${Math.min(100, spentPercent)}%` }}
                           ></div>
                         </div>
                       </td>
@@ -231,14 +261,14 @@ export const AdminResults = () => {
         </div>
 
         {/* Unsold Players */}
-        {unsoldPlayers > 0 && (
+        {(unsoldPlayers > 0 || pendingPlayers > 0) && (
           <div className="card">
             <h2 className="text-2xl font-bold text-primary mb-6">
-              Unsold Players ({unsoldPlayers})
+              Unsold / Pending Players ({unsoldPlayers + pendingPlayers})
             </h2>
             <div className="grid md:grid-cols-3 gap-4">
               {playersList
-                .filter((p) => !p.soldPrice)
+                .filter((p) => !p.soldTo)
                 .map((player) => {
                   const group = groupsById.get(String(player.group_id));
                   return (

@@ -24,6 +24,7 @@ export const AdminPlayers = () => {
   const { auctionId } = useParams();
   const navigate = useNavigate();
   const { addPlayer, deletePlayer, updatePlayer } = useAuction();
+  const { data: auctionData } = useRealtimeData(`auctions/${auctionId}`);
   const { data: playersData } = useRealtimeData(
     `auctions/${auctionId}/players`,
   );
@@ -120,11 +121,22 @@ export const AdminPlayers = () => {
     }
   };
 
-  // Delete player
-  const handleDeletePlayer = async (playerId, playerName) => {
+  // Delete player (with refund if sold)
+  const handleDeletePlayer = async (player) => {
     try {
-      await deletePlayer(auctionId, playerId);
-      showToast(`${playerName} removed`, "success");
+      // If player was sold, refund the team's budget and remove from squad
+      if (player.soldTo) {
+        const team = teamsList.find((t) => String(t.id) === String(player.soldTo));
+        if (team) {
+          const teamRef = ref(db, `auctions/${auctionId}/teams/${team.id}`);
+          await update(teamRef, {
+            squad: (team.squad || []).filter((pid) => String(pid) !== String(player.id)),
+            budget_remaining: Number(team.budget_remaining || 0) + Number(player.soldPrice || 0),
+          });
+        }
+      }
+      await deletePlayer(auctionId, player.id);
+      showToast(`${player.player_name} removed`, "success");
     } catch (error) {
       showToast("Error deleting player: " + error.message, "error");
     }
@@ -164,6 +176,42 @@ export const AdminPlayers = () => {
         const oldTeamId = salePlayer.soldTo;
         const newTeamId = saleForm.soldTo;
         const oldPrice = Number(salePlayer.soldPrice) || 0;
+
+        // --- Eligibility checks when assigning to a (possibly new) team ---
+        const isTeamChange = String(oldTeamId) !== String(newTeamId);
+        if (isTeamChange || !oldTeamId) {
+          const newTeam = teamsList.find((t) => String(t.id) === String(newTeamId));
+          if (newTeam) {
+            // Budget check
+            const effectiveBudget = Number(newTeam.budget_remaining || 0);
+            if (newPrice > effectiveBudget) {
+              showToast(`${newTeam.team_name} can't afford ₹${newPrice.toLocaleString()} (budget: ₹${effectiveBudget.toLocaleString()})`, "error");
+              return;
+            }
+            // Max squad size check
+            const maxSquad = Number(auctionData?.max_players_per_team) || Infinity;
+            const currentSquadSize = newTeam.squad?.length || 0;
+            if (currentSquadSize >= maxSquad) {
+              showToast(`${newTeam.team_name} squad is full (${maxSquad} players)`, "error");
+              return;
+            }
+            // Group limit check
+            const playerGroup = groupsList.find((g) => String(g.id) === String(salePlayer.group_id));
+            const groupMax = Number(playerGroup?.max_per_team) || Infinity;
+            if (groupMax !== Infinity) {
+              const groupCount = playersList.filter(
+                (p) =>
+                  String(p.group_id) === String(salePlayer.group_id) &&
+                  String(p.soldTo) === String(newTeamId) &&
+                  String(p.id) !== String(salePlayer.id),
+              ).length;
+              if (groupCount >= groupMax) {
+                showToast(`${newTeam.team_name} already has ${groupMax} player(s) from ${playerGroup.group_name}`, "error");
+                return;
+              }
+            }
+          }
+        }
 
         // If team changed, update old team (remove player, refund) and new team (add player, deduct)
         if (String(oldTeamId) !== String(newTeamId) && oldTeamId) {
@@ -257,7 +305,7 @@ export const AdminPlayers = () => {
     return null;
   };
 
-  // Bulk upload CSV
+  // Bulk upload CSV (parallel batched)
   const handleBulkUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -265,10 +313,14 @@ export const AdminPlayers = () => {
     try {
       const csvPlayers = await parsePlayersCSV(file);
 
-      let addedCount = 0;
+      // Prepare valid players first
+      const validPlayers = [];
       let skippedCount = 0;
       for (const player of csvPlayers) {
-        if (!player.player_name) continue;
+        if (!player.player_name) {
+          if (Object.values(player).some((v) => v)) skippedCount++;
+          continue;
+        }
 
         const groupId = resolveGroupId(player.group_id || player.group_name || player.group);
         if (!groupId) {
@@ -285,11 +337,22 @@ export const AdminPlayers = () => {
 
         const errors = validatePlayer(playerData);
         if (!errors) {
-          await addPlayer(auctionId, playerData);
-          addedCount++;
+          validPlayers.push(playerData);
         } else {
           skippedCount++;
         }
+      }
+
+      // Upload in parallel batches of 10
+      const BATCH_SIZE = 10;
+      let addedCount = 0;
+      for (let i = 0; i < validPlayers.length; i += BATCH_SIZE) {
+        const batch = validPlayers.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map((p) => addPlayer(auctionId, p)),
+        );
+        addedCount += results.filter((r) => r.status === "fulfilled").length;
+        skippedCount += results.filter((r) => r.status === "rejected").length;
       }
 
       const msg = skippedCount > 0
@@ -380,33 +443,33 @@ Jasprit Bumrah,30,${exampleGroup},
   );
 
   return (
-    <div className="min-h-screen bg-lightBg p-6">
+    <div className="min-h-screen bg-lightBg p-3 sm:p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-center mb-4">
-          <div>
-            <h1 className="text-4xl font-bold text-primary">Manage Players</h1>
-            <p className="text-textLight">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-4xl font-bold text-primary">Manage Players</h1>
+            <p className="text-textLight text-sm">
               {selectedGroup === "all"
                 ? `Total Players: ${playersList.length}`
                 : `Showing ${filteredPlayers.length} of ${playersList.length} players`}
             </p>
           </div>
-          <div className="flex gap-3 flex-wrap">
+          <div className="flex gap-2 flex-wrap">
             <button
               onClick={() => navigate(ROUTES.ADMIN_SETUP)}
-              className="btn btn-secondary flex items-center gap-2"
+              className="btn btn-sm btn-secondary flex items-center gap-1"
             >
-              <IoArrowBack size={18} /> Dashboard
+              <IoArrowBack size={16} /> Dashboard
             </button>
             <button
               onClick={downloadTemplate}
-              className="btn btn-secondary flex items-center gap-2"
+              className="btn btn-sm btn-secondary flex items-center gap-1"
             >
-              <IoDownload size={18} /> Template
+              <IoDownload size={16} /> Template
             </button>
-            <label className="btn btn-secondary cursor-pointer flex items-center gap-2">
-              <IoDownload size={18} /> CSV Upload
+            <label className="btn btn-sm btn-secondary cursor-pointer flex items-center gap-1">
+              <IoDownload size={16} /> CSV
               <input
                 type="file"
                 accept=".csv"
@@ -416,16 +479,16 @@ Jasprit Bumrah,30,${exampleGroup},
             </label>
             <button
               onClick={openAddModal}
-              className="btn btn-primary flex items-center gap-2"
+              className="btn btn-sm btn-primary flex items-center gap-1"
             >
-              <IoAdd size={20} /> Add Player
+              <IoAdd size={18} /> Add
             </button>
             {playersList.length > 0 && (
               <button
                 onClick={() => navigate(ROUTES.ADMIN_LIVE(auctionId))}
-                className="btn flex items-center gap-2 bg-success hover:bg-green-700 text-white"
+                className="btn btn-sm flex items-center gap-1 bg-success hover:bg-green-700 text-white"
               >
-                Live Auction <IoArrowForward size={18} />
+                Live <IoArrowForward size={16} />
               </button>
             )}
           </div>
@@ -504,7 +567,7 @@ Jasprit Bumrah,30,${exampleGroup},
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full table-improved">
                 <thead>
                   <tr className="border-b-2 border-border">
                     <th className="text-left py-4 px-4 font-bold text-primary">#</th>
@@ -575,7 +638,7 @@ Jasprit Bumrah,30,${exampleGroup},
                               <IoSwapHorizontal size={16} />
                             </button>
                             <button
-                              onClick={() => handleDeletePlayer(player.id, player.player_name)}
+                              onClick={() => handleDeletePlayer(player)}
                               className="btn btn-danger btn-sm"
                               title="Delete player"
                             >

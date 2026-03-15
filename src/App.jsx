@@ -9,6 +9,8 @@ import { AdminResults } from "./pages/admin/AdminResults";
 import { AuctionDashboard } from "./pages/viewer/AuctionDashboard";
 import { TeamDetails } from "./pages/viewer/TeamDetails";
 import { PlayerPool } from "./pages/viewer/PlayerPool";
+import { TeamOwnerView } from "./pages/viewer/TeamOwnerView";
+import { ProjectorScreen } from "./pages/viewer/ProjectorScreen";
 import { AuthGate } from "./components/AuthGate";
 import "./App.css";
 
@@ -58,6 +60,8 @@ function App() {
         <Route path="/auction/:auctionId" element={<AuctionDashboard />} />
         <Route path="/auction/:auctionId/teams" element={<TeamDetails />} />
         <Route path="/auction/:auctionId/players" element={<PlayerPool />} />
+        <Route path="/auction/:auctionId/team/:teamId" element={<TeamOwnerView />} />
+        <Route path="/auction/:auctionId/projector" element={<ProjectorScreen />} />
 
         {/* 404 Not Found */}
         <Route path="*" element={<NotFound />} />

@@ -16,14 +16,22 @@ import {
   IoClose,
   IoRefresh,
   IoPeople,
+  IoVolumeHigh,
+  IoVolumeMute,
+  IoTv,
 } from "react-icons/io5";
 import { ref, update } from "firebase/database";
 import { db } from "../../utils/firebaseConfig";
+import { useSound } from "../../hooks/useSound";
+import { AnimatedNumber } from "../../components/AnimatedNumber";
+import { IoAlertCircle } from "react-icons/io5";
+import confetti from "canvas-confetti";
 
 export const AdminLive = () => {
   const { auctionId } = useParams();
   const navigate = useNavigate();
   const { toasts, showToast, removeToast } = useToast();
+  const { isMuted, toggleMute, play } = useSound();
 
   // Real-time data
   const { data: auctionData, error: auctionError } = useRealtimeData(`auctions/${auctionId}`);
@@ -132,6 +140,19 @@ export const AdminLive = () => {
     return -1;
   };
 
+  // Sync live state to Firebase so viewers can see current player & bid in real-time
+  useEffect(() => {
+    if (!auctionId || sortedPlayers.length === 0) return;
+    const liveStateRef = ref(db, `auctions/${auctionId}/live_state`);
+    update(liveStateRef, {
+      currentPlayerId: currentPlayer?.id || null,
+      currentBid: currentBid,
+      isPaused: auctionPaused,
+      isComplete: isAuctionComplete,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [auctionId, currentPlayer?.id, currentBid, auctionPaused, isAuctionComplete, sortedPlayers.length]);
+
   // Initialize bid when switching to a new unsold player
   useEffect(() => {
     if (currentPlayer && currentGroup && !isPlayerProcessed) {
@@ -150,6 +171,13 @@ export const AdminLive = () => {
     }
   }, [sortedPlayers.length, initialAdvanceDone]);
 
+  // Play fanfare when auction completes
+  useEffect(() => {
+    if (isAuctionComplete) {
+      play("complete");
+    }
+  }, [isAuctionComplete, play]);
+
   // Handle increment
   const handleIncrement = async () => {
     if (!currentGroup || isPlayerProcessed) return;
@@ -160,6 +188,7 @@ export const AdminLive = () => {
         null,
       );
       showToast(`Bid increased to ₹${newBid.toLocaleString()}`, "success");
+      play("bid");
     } catch (error) {
       showToast(error.message, "error");
     }
@@ -173,7 +202,7 @@ export const AdminLive = () => {
       return;
     }
     try {
-      const newBid = await decrementBid(currentGroup.increment_value);
+      const newBid = await decrementBid(currentGroup.increment_value, currentGroup.base_price || 0);
       if (newBid >= (currentGroup.base_price || 0)) {
         showToast(`Bid decreased to ₹${newBid.toLocaleString()}`, "success");
       }
@@ -189,6 +218,7 @@ export const AdminLive = () => {
       const playerRef = ref(db, `auctions/${auctionId}/players/${currentPlayer.id}`);
       await update(playerRef, { unsold: true });
       showToast(`${currentPlayer.player_name} marked as unsold`, "info");
+      play("unsold");
       const nextIdx = findNextUnsold();
       if (nextIdx !== -1) setCurrentPlayerIndex(nextIdx);
     } catch (error) {
@@ -241,6 +271,13 @@ export const AdminLive = () => {
         `${currentPlayer.player_name} sold to ${selectedTeam.team_name}!`,
         "success",
       );
+      play("sold");
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ["#ffc107", "#1a3a52", "#10b981"],
+      });
       setShowWinnerModal(false);
 
       // Advance to next unsold player
@@ -296,8 +333,8 @@ export const AdminLive = () => {
   if (isAuctionComplete) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary to-darkBg flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-2xl p-8 max-w-lg w-full text-center">
-          <h1 className="text-3xl font-bold text-primary mb-2">Auction Complete!</h1>
+        <div className="bg-white rounded-lg shadow-2xl p-6 sm:p-8 max-w-lg w-full text-center">
+          <h1 className="text-2xl sm:text-3xl font-bold text-primary mb-2">Auction Complete!</h1>
           <p className="text-textLight mb-6">All {sortedPlayers.length} players have been processed.</p>
 
           <div className="flex justify-center gap-8 mb-6">
@@ -319,7 +356,7 @@ export const AdminLive = () => {
               const teamPlayerCount = sortedPlayers.filter(
                 (p) => String(p.soldTo) === String(team.id),
               ).length;
-              const spent = team.budget_total - (team.budget_remaining || 0);
+              const spent = Number(team.budget_total || 0) - Number(team.budget_remaining || 0);
               return (
                 <div
                   key={team.id}
@@ -441,40 +478,54 @@ export const AdminLive = () => {
     <div className="min-h-screen bg-gradient-to-br from-primary to-darkBg p-4">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-center mb-4">
-          <div>
-            <h1 className="text-4xl font-bold text-secondary">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-4xl font-bold text-secondary truncate">
               {auctionData?.name}
             </h1>
-            <p className="text-gray-300">
+            <p className="text-gray-300 text-xs sm:text-base">
               Player {currentPlayerIndex + 1} of {sortedPlayers.length} | {soldCount} sold, {unsoldCount} unsold, {remainingCount} remaining
             </p>
           </div>
-          <div className="flex gap-3 flex-wrap">
+          <div className="flex gap-2 sm:gap-3 flex-wrap">
+            <button
+              onClick={toggleMute}
+              className="btn btn-sm btn-secondary flex items-center gap-1"
+              title={isMuted ? "Unmute sounds" : "Mute sounds"}
+            >
+              {isMuted ? <IoVolumeMute size={16} /> : <IoVolumeHigh size={16} />}
+            </button>
+            <button
+              onClick={() => window.open(ROUTES.PROJECTOR(auctionId), "_blank")}
+              className="btn btn-sm btn-secondary flex items-center gap-1"
+              title="Open Projector Screen"
+            >
+              <IoTv size={16} /> Projector
+            </button>
             <button
               onClick={() => navigate(ROUTES.ADMIN_PLAYERS(auctionId))}
-              className="btn btn-secondary flex items-center gap-2"
+              className="btn btn-sm sm:btn-sm btn-secondary flex items-center gap-1"
             >
-              <IoPeople size={18} /> Players
+              <IoPeople size={16} /> Players
             </button>
             <button
               onClick={() => setAuctionPaused(!auctionPaused)}
-              className={`btn flex items-center gap-2 ${auctionPaused ? "btn-success" : "btn-danger"}`}
+              className={`btn btn-sm flex items-center gap-1 ${auctionPaused ? "btn-success" : "btn-danger"}`}
             >
-              {auctionPaused ? <IoPlay size={20} /> : <IoPause size={20} />}
+              {auctionPaused ? <IoPlay size={16} /> : <IoPause size={16} />}
               {auctionPaused ? "Resume" : "Pause"}
             </button>
             {unsoldPlayersList.length > 0 && (
               <button
                 onClick={() => setShowUnsoldPanel(true)}
-                className="btn btn-secondary flex items-center gap-2"
+                className="btn btn-sm btn-secondary flex items-center gap-1"
               >
-                <IoRefresh size={18} /> Unsold ({unsoldPlayersList.length})
+                <IoRefresh size={16} /> Unsold ({unsoldPlayersList.length})
               </button>
             )}
             <button
               onClick={() => undoLastBid(currentGroup?.base_price || 0)}
-              className="btn btn-secondary"
+              className="btn btn-sm btn-secondary"
               disabled={isPlayerProcessed || bidHistory.length === 0}
             >
               Undo
@@ -519,7 +570,7 @@ export const AdminLive = () => {
               {/* Sold / Unsold badge */}
               {isPlayerProcessed && (
                 <div
-                  className={`absolute top-4 right-4 z-10 px-3 py-1 rounded-full text-sm font-bold ${
+                  className={`absolute top-4 right-4 z-10 px-4 py-1.5 rounded-full text-sm font-bold animate-fade-in-up ${
                     currentPlayer.soldTo
                       ? "bg-success text-white"
                       : "bg-danger text-white"
@@ -529,8 +580,8 @@ export const AdminLive = () => {
                 </div>
               )}
 
-              {/* Player Photo */}
-              <div className="w-full h-64 bg-gray-300 flex items-center justify-center text-gray-500">
+              {/* Hero Player Photo */}
+              <div className="relative w-full h-64 sm:h-80 lg:h-[28rem]">
                 {currentPlayer.photo_url ? (
                   <img
                     src={currentPlayer.photo_url}
@@ -538,64 +589,41 @@ export const AdminLive = () => {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <span>No Photo</span>
-                )}
-              </div>
-
-              {/* Player Info */}
-              <div className="p-6">
-                <h2 className="text-2xl font-bold text-primary mb-4">
-                  {currentPlayer.player_name}
-                </h2>
-
-                <div className="space-y-3 mb-6">
-                  <div className="flex justify-between">
-                    <span className="text-textLight">Age:</span>
-                    <span className="font-bold text-text">{currentPlayer.age}</span>
+                  <div className="w-full h-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                    <span className="text-7xl sm:text-8xl font-bold text-white/30">
+                      {currentPlayer.player_name?.charAt(0)}
+                    </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-textLight">Group:</span>
-                    <span className="font-bold text-secondary">
+                )}
+                {/* Gradient overlay with name */}
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 sm:p-6">
+                  <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-1">
+                    {currentPlayer.player_name}
+                  </h2>
+                  <div className="flex items-center gap-3">
+                    <span className="text-white/80 text-sm sm:text-base">Age: {currentPlayer.age}</span>
+                    <span className="bg-secondary text-primary px-2 py-0.5 rounded text-xs sm:text-sm font-bold">
                       {currentGroup.group_name}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-textLight">Base Price:</span>
-                    <span className="font-bold text-text">
-                      ₹{(currentGroup.base_price || 0).toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-textLight">Increment:</span>
-                    <span className="font-bold text-text">
-                      ₹{currentGroup.increment_value.toLocaleString()}
-                    </span>
-                  </div>
+                </div>
+              </div>
+
+              {/* Compact Info Row */}
+              <div className="p-3 sm:p-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-textLight">Base: <span className="font-bold text-text">₹{(currentGroup.base_price || 0).toLocaleString()}</span></span>
+                  <span className="text-textLight">Inc: <span className="font-bold text-text">₹{currentGroup.increment_value.toLocaleString()}</span></span>
                   {currentGroup.max_bid_cap && (
-                    <div className="flex justify-between pt-3 border-t border-border">
-                      <span className="text-textLight">Max Cap:</span>
-                      <span className="font-bold text-danger">
-                        ₹{currentGroup.max_bid_cap.toLocaleString()}
-                      </span>
-                    </div>
-                  )}
-                  {currentPlayer.soldTo && (
-                    <div className="flex justify-between pt-3 border-t border-border">
-                      <span className="text-textLight">Sold To:</span>
-                      <span className="font-bold text-success">
-                        {teamsList.find((t) => String(t.id) === String(currentPlayer.soldTo))?.team_name || "Unknown"}
-                      </span>
-                    </div>
-                  )}
-                  {currentPlayer.soldPrice && (
-                    <div className="flex justify-between">
-                      <span className="text-textLight">Sold Price:</span>
-                      <span className="font-bold text-success">
-                        ₹{currentPlayer.soldPrice.toLocaleString()}
-                      </span>
-                    </div>
+                    <span className="text-textLight">Cap: <span className="font-bold text-danger">₹{currentGroup.max_bid_cap.toLocaleString()}</span></span>
                   )}
                 </div>
+                {currentPlayer.soldTo && (
+                  <div className="flex justify-between mt-2 pt-2 border-t border-border text-sm">
+                    <span className="text-textLight">Sold To: <span className="font-bold text-success">{teamsList.find((t) => String(t.id) === String(currentPlayer.soldTo))?.team_name || "Unknown"}</span></span>
+                    <span className="font-bold text-success">₹{(currentPlayer.soldPrice || 0).toLocaleString()}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -631,14 +659,14 @@ export const AdminLive = () => {
 
           {/* Bidding Panel (Center) */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-xl p-8 text-center">
+            <div className="bg-white rounded-lg shadow-xl p-4 sm:p-8 text-center">
               {isPlayerProcessed ? (
                 <div>
                   <p className="text-textLight mb-2">
                     {currentPlayer.soldTo ? "Sold For" : "Status"}
                   </p>
                   <div
-                    className={`text-5xl font-bold mb-6 ${
+                    className={`text-3xl sm:text-5xl font-bold mb-6 animate-fade-in-up ${
                       currentPlayer.soldTo ? "text-success" : "text-danger"
                     }`}
                   >
@@ -665,8 +693,11 @@ export const AdminLive = () => {
               ) : (
                 <>
                   <p className="text-textLight mb-2">Current Bid</p>
-                  <div className="text-6xl font-bold text-secondary mb-8 animate-pulse-bid">
-                    ₹{currentBid.toLocaleString()}
+                  <div className="mb-6 sm:mb-8 animate-pulse-bid">
+                    <AnimatedNumber
+                      value={currentBid}
+                      className="text-4xl sm:text-6xl font-bold text-secondary"
+                    />
                   </div>
 
                   {auctionPaused && (
@@ -719,59 +750,46 @@ export const AdminLive = () => {
 
           {/* Teams Sidebar (Right) */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-xl p-6">
-              <h3 className="text-xl font-bold text-primary mb-4">
+            <div className="bg-white rounded-lg shadow-xl p-3 sm:p-4">
+              <h3 className="text-base sm:text-lg font-bold text-primary mb-3">
                 Teams ({teamsList.length})
               </h3>
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              <div className="space-y-1">
                 {teamsList.map((team) => {
                   const info = teamEligibility.find((e) => e.teamId === team.id);
                   const budgetExceeded = info && !info.canAfford && !isPlayerProcessed;
                   const isIneligible = info && !info.eligible && !isPlayerProcessed;
 
                   return (
-                  <div
-                    key={team.id}
-                    className={`p-4 border-2 rounded-lg transition ${
-                      budgetExceeded
-                        ? "border-red-400 bg-red-50"
-                        : isIneligible
-                          ? "border-orange-300 bg-orange-50"
-                          : "border-border hover:border-primary"
-                    }`}
-                  >
-                    <p className="font-bold text-text">{team.team_name}</p>
-                    <p className="text-sm text-textLight mb-2">
-                      {team.owner_name}
-                    </p>
-                    <div className="mb-3">
-                      <div className="flex justify-between text-xs mb-1">
-                        <span>Budget</span>
-                        <span className={`font-bold ${budgetExceeded ? "text-red-600" : ""}`}>
-                          ₹{(team.budget_remaining || 0).toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full ${budgetExceeded ? "bg-red-500" : "bg-primary"}`}
-                          style={{
-                            width: `${Math.max(0, (team.budget_remaining / team.budget_total) * 100)}%`,
-                          }}
-                        ></div>
-                      </div>
-                    </div>
-                    <div className="flex justify-between text-xs text-textLight">
-                      <span>Squad: {team.squad?.length || 0}{auctionData?.max_players_per_team ? `/${auctionData.max_players_per_team}` : ""}</span>
-                      {currentGroup?.max_per_team && info && (
-                        <span>Group: {info.groupCount}/{currentGroup.max_per_team}</span>
+                    <div
+                      key={team.id}
+                      className={`flex items-center gap-2 py-2 px-3 rounded-md border-l-4 transition group relative ${
+                        budgetExceeded
+                          ? "border-l-red-500 bg-red-50"
+                          : isIneligible
+                            ? "border-l-orange-400 bg-orange-50"
+                            : "border-l-green-500 hover:bg-gray-50"
+                      }`}
+                    >
+                      <span className="font-bold text-sm text-text truncate flex-1 min-w-0">
+                        {team.team_name}
+                      </span>
+                      <span className={`text-xs font-semibold whitespace-nowrap ${budgetExceeded ? "text-red-600" : "text-textLight"}`}>
+                        ₹{(team.budget_remaining || 0).toLocaleString()}
+                      </span>
+                      <span className="bg-primary/10 text-primary text-xs font-bold px-1.5 py-0.5 rounded whitespace-nowrap">
+                        {team.squad?.length || 0}/{auctionData?.max_players_per_team || "∞"}
+                      </span>
+                      {isIneligible && (
+                        <IoAlertCircle className="text-red-500 flex-shrink-0" size={18} title={info.reasons.join(" | ")} />
+                      )}
+                      {/* Tooltip on hover */}
+                      {isIneligible && info.reasons.length > 0 && (
+                        <div className="absolute bottom-full left-0 mb-1 hidden group-hover:block z-20 bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap shadow-lg">
+                          {info.reasons.join(" | ")}
+                        </div>
                       )}
                     </div>
-                    {isIneligible && info.reasons.length > 0 && (
-                      <p className="text-xs text-red-500 mt-1 font-semibold">
-                        {info.reasons.join(" | ")}
-                      </p>
-                    )}
-                  </div>
                   );
                 })}
               </div>

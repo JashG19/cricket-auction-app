@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect } from "react";
 import { IoClose } from "react-icons/io5";
 
 export const Modal = ({
@@ -12,11 +12,30 @@ export const Modal = ({
   cancelText = "Cancel",
   isDanger = false,
 }) => {
+  // Escape key handler and body scroll lock
+  useEffect(() => {
+    if (!isOpen) return;
+    document.body.style.overflow = "hidden";
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") onClose?.();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 animate-slideIn">
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 fade-in"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose?.();
+      }}
+    >
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 animate-fade-in-up">
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-border">
           <h2 className="text-xl font-bold text-text">{title}</h2>
@@ -36,7 +55,7 @@ export const Modal = ({
           <div className="flex gap-3 p-6 border-t border-border justify-end">
             {onCancel && (
               <button
-                onClick={onCancel || onClose}
+                onClick={onCancel}
                 className="px-4 py-2 rounded border border-border text-text hover:bg-lightBg transition"
               >
                 {cancelText}

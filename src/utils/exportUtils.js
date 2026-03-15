@@ -1,5 +1,7 @@
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 /**
  * Export teams and players to CSV
@@ -54,9 +56,9 @@ export const exportToCSV = (
         player.player_name,
         player.age,
         player.group_name,
-        player.base_price,
+        player.base_price || 0,
         player.soldPrice || "Unsold",
-        player.soldTo || "-",
+        player.team_name || "-",
       ]);
     });
 
@@ -97,9 +99,9 @@ export const exportToExcel = (
       "Player Name": player.player_name,
       Age: player.age,
       Group: player.group_name,
-      "Base Price": player.base_price,
+      "Base Price": player.base_price || 0,
       "Sold Price": player.soldPrice || "Unsold",
-      "Sold To": player.soldTo || "-",
+      "Sold To": player.team_name || "-",
     }));
 
     const playersSheet = XLSX.utils.json_to_sheet(playersData);
@@ -117,11 +119,11 @@ export const exportToExcel = (
       },
       {
         Metric: "Sold Players",
-        Value: players.filter((p) => p.soldPrice).length,
+        Value: players.filter((p) => p.soldTo).length,
       },
       {
         Metric: "Unsold Players",
-        Value: players.filter((p) => !p.soldPrice).length,
+        Value: players.filter((p) => !p.soldTo).length,
       },
       {
         Metric: "Total Amount Spent",
@@ -154,7 +156,7 @@ export const exportTeamSquads = (
     const workbook = XLSX.utils.book_new();
 
     teams.forEach((team) => {
-      const teamPlayers = players.filter((p) => p.soldTo === team.id);
+      const teamPlayers = players.filter((p) => String(p.soldTo) === String(team.id));
 
       const squadData = teamPlayers.map((player) => ({
         "Player Name": player.player_name,
@@ -188,8 +190,8 @@ export const generateAuctionSummary = (auctionData, teams, players) => {
     purseSize: auctionData.purseSize,
     totalTeams: teams.length,
     totalPlayers: players.length,
-    soldPlayers: players.filter((p) => p.soldPrice).length,
-    unsoldPlayers: players.filter((p) => !p.soldPrice).length,
+    soldPlayers: players.filter((p) => p.soldTo).length,
+    unsoldPlayers: players.filter((p) => !p.soldTo).length,
     totalSpent: teams.reduce(
       (sum, team) => sum + (team.budget_total - team.budget_remaining),
       0,
@@ -203,11 +205,131 @@ export const generateAuctionSummary = (auctionData, teams, players) => {
       squadSize: team.squad?.length || 0,
       squadPlayers:
         team.squad?.map((pid) => {
-          const player = players.find((p) => p.id === pid);
+          const player = players.find((p) => String(p.id) === String(pid));
           return player?.player_name;
         }) || [],
     })),
   };
+};
+
+/**
+ * Export auction results to PDF
+ */
+export const exportToPDF = (auctionData, teams, players, filename = "auction_results.pdf") => {
+  try {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Title Page
+    doc.setFontSize(24);
+    doc.setTextColor(26, 58, 82);
+    doc.text(auctionData?.name || "Cricket Auction", pageWidth / 2, 60, { align: "center" });
+
+    doc.setFontSize(14);
+    doc.setTextColor(100);
+    doc.text("Auction Results", pageWidth / 2, 75, { align: "center" });
+
+    doc.setFontSize(12);
+    const dateStr = auctionData?.date
+      ? new Date(auctionData.date).toLocaleDateString()
+      : new Date().toLocaleDateString();
+    doc.text(`Date: ${dateStr}`, pageWidth / 2, 90, { align: "center" });
+
+    const soldCount = players.filter((p) => p.soldTo).length;
+    const unsoldCount = players.filter((p) => !p.soldTo).length;
+    const totalSpent = teams.reduce(
+      (sum, t) => sum + (Number(t.budget_total || 0) - Number(t.budget_remaining || 0)),
+      0,
+    );
+
+    doc.setFontSize(11);
+    doc.text(
+      `Teams: ${teams.length}  |  Players: ${players.length}  |  Sold: ${soldCount}  |  Unsold: ${unsoldCount}`,
+      pageWidth / 2, 110, { align: "center" },
+    );
+    doc.text(
+      `Total Amount Spent: Rs. ${totalSpent.toLocaleString()}`,
+      pageWidth / 2, 120, { align: "center" },
+    );
+
+    // Team Results Table
+    doc.addPage();
+    doc.setFontSize(16);
+    doc.setTextColor(26, 58, 82);
+    doc.text("Team Results", 14, 20);
+
+    autoTable(doc, {
+      startY: 30,
+      head: [["Team", "Owner", "Budget", "Spent", "Remaining", "Players"]],
+      body: teams.map((team) => {
+        const spent = Number(team.budget_total || 0) - Number(team.budget_remaining || 0);
+        return [
+          team.team_name,
+          team.owner_name,
+          `Rs. ${(team.budget_total || 0).toLocaleString()}`,
+          `Rs. ${spent.toLocaleString()}`,
+          `Rs. ${(team.budget_remaining || 0).toLocaleString()}`,
+          team.squad?.length || 0,
+        ];
+      }),
+      headStyles: { fillColor: [26, 58, 82] },
+      alternateRowStyles: { fillColor: [248, 249, 250] },
+      styles: { fontSize: 10 },
+    });
+
+    // Sold Players Table
+    const soldPlayers = players.filter((p) => p.soldTo);
+    if (soldPlayers.length > 0) {
+      doc.addPage();
+      doc.setFontSize(16);
+      doc.setTextColor(26, 58, 82);
+      doc.text("Sold Players", 14, 20);
+
+      autoTable(doc, {
+        startY: 30,
+        head: [["Player", "Age", "Group", "Base Price", "Sold Price", "Team"]],
+        body: soldPlayers.map((p) => [
+          p.player_name,
+          p.age,
+          p.group_name || "N/A",
+          `Rs. ${(p.base_price || 0).toLocaleString()}`,
+          `Rs. ${(p.soldPrice || 0).toLocaleString()}`,
+          p.team_name || "-",
+        ]),
+        headStyles: { fillColor: [26, 58, 82] },
+        alternateRowStyles: { fillColor: [248, 249, 250] },
+        styles: { fontSize: 9 },
+      });
+    }
+
+    // Unsold Players Section
+    const unsoldPlayers = players.filter((p) => !p.soldTo);
+    if (unsoldPlayers.length > 0) {
+      doc.addPage();
+      doc.setFontSize(16);
+      doc.setTextColor(26, 58, 82);
+      doc.text(`Unsold Players (${unsoldPlayers.length})`, 14, 20);
+
+      autoTable(doc, {
+        startY: 30,
+        head: [["Player", "Age", "Group", "Base Price"]],
+        body: unsoldPlayers.map((p) => [
+          p.player_name,
+          p.age,
+          p.group_name || "N/A",
+          `Rs. ${(p.base_price || 0).toLocaleString()}`,
+        ]),
+        headStyles: { fillColor: [239, 68, 68] },
+        alternateRowStyles: { fillColor: [248, 249, 250] },
+        styles: { fontSize: 9 },
+      });
+    }
+
+    doc.save(filename);
+  } catch (error) {
+    console.error("Error exporting to PDF:", error);
+    throw error;
+  }
 };
 
 /**

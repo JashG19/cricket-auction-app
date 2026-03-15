@@ -12,7 +12,8 @@ import {
 } from "../../utils/validationUtils";
 import { firebaseObjectToArray } from "../../utils/dataTransformUtils";
 import { ROUTES } from "../../constants/routes";
-import { IoAdd, IoTrash, IoArrowForward, IoPeople, IoPlay, IoStatsChart, IoPencil, IoLayers } from "react-icons/io5";
+import { QRCodeSVG } from "qrcode.react";
+import { IoAdd, IoTrash, IoArrowForward, IoPeople, IoPlay, IoStatsChart, IoPencil, IoLayers, IoShareSocial, IoCopy } from "react-icons/io5";
 
 export const AdminSetup = () => {
   const navigate = useNavigate();
@@ -23,6 +24,7 @@ export const AdminSetup = () => {
   const [managingGroupsAuctionId, setManagingGroupsAuctionId] = useState(null);
   const [showExistingGroupModal, setShowExistingGroupModal] = useState(false);
   const [editingExistingGroup, setEditingExistingGroup] = useState(null);
+  const [shareAuctionId, setShareAuctionId] = useState(null);
   const [existingGroupForm, setExistingGroupForm] = useState({
     group_name: "",
     base_price: "",
@@ -61,6 +63,7 @@ export const AdminSetup = () => {
     team_name: "",
     owner_name: "",
     budget_total: "",
+    pin: "",
   });
   const [groupForm, setGroupForm] = useState({
     group_name: "",
@@ -121,8 +124,16 @@ export const AdminSetup = () => {
       return;
     }
 
-    setTeams([...teams, { ...teamForm, id: Date.now() }]);
-    setTeamForm({ team_name: "", owner_name: "", budget_total: "" });
+    const duplicate = teams.find(
+      (t) => t.team_name.toLowerCase().trim() === teamForm.team_name.toLowerCase().trim(),
+    );
+    if (duplicate) {
+      showToast(`Team "${teamForm.team_name}" already exists`, "error");
+      return;
+    }
+
+    setTeams([...teams, { ...teamForm, id: `local_${Date.now()}_${Math.random().toString(36).slice(2, 7)}` }]);
+    setTeamForm({ team_name: "", owner_name: "", budget_total: "", pin: "" });
     setShowTeamModal(false);
     showToast("Team added", "success");
   };
@@ -135,7 +146,7 @@ export const AdminSetup = () => {
       return;
     }
 
-    setGroups([...groups, { ...groupForm, id: Date.now() }]);
+    setGroups([...groups, { ...groupForm, id: `local_${Date.now()}_${Math.random().toString(36).slice(2, 7)}` }]);
     setGroupForm({ group_name: "", base_price: "", increment_value: "", max_bid_cap: "", max_per_team: "" });
     setShowGroupModal(false);
     showToast("Group added", "success");
@@ -159,8 +170,21 @@ export const AdminSetup = () => {
   );
   const managedGroupsList = firebaseObjectToArray(managedGroupsData);
 
-  // Delete an existing auction
+  // Fetch players for the auction being managed (needed to check group assignments before delete)
+  const { data: managedPlayersData } = useRealtimeData(
+    managingGroupsAuctionId ? `auctions/${managingGroupsAuctionId}/players` : null,
+  );
+  const managedPlayersList = firebaseObjectToArray(managedPlayersData);
+
+  // Delete an existing auction (blocked if currently live)
   const handleDeleteAuction = async (auctionId) => {
+    // Check if auction has an active live_state
+    const auctionObj = existingAuctions.find((a) => String(a.id) === String(auctionId));
+    if (auctionObj?.live_state && !auctionObj.live_state.isComplete) {
+      showToast("Cannot delete — this auction is currently live. Complete or stop it first.", "error");
+      setDeleteConfirmId(null);
+      return;
+    }
     try {
       await deleteAuction(auctionId);
       setDeleteConfirmId(null);
@@ -212,8 +236,18 @@ export const AdminSetup = () => {
     }
   };
 
-  // Delete group from existing auction
+  // Delete group from existing auction (blocked if players are assigned)
   const handleDeleteExistingGroup = async (groupId, groupName) => {
+    const assignedPlayers = managedPlayersList.filter(
+      (p) => String(p.group_id) === String(groupId),
+    );
+    if (assignedPlayers.length > 0) {
+      showToast(
+        `Cannot delete "${groupName}" — ${assignedPlayers.length} player(s) are assigned to it. Remove or reassign them first.`,
+        "error",
+      );
+      return;
+    }
     try {
       await deleteGroup(managingGroupsAuctionId, groupId);
       showToast(`${groupName} deleted`, "success");
@@ -223,10 +257,10 @@ export const AdminSetup = () => {
   };
 
   return (
-    <div className="min-h-screen bg-lightBg p-6">
+    <div className="min-h-screen bg-lightBg p-3 sm:p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <h1 className="text-4xl font-bold text-primary mb-2">Admin Dashboard</h1>
+        <h1 className="text-2xl sm:text-4xl font-bold text-primary mb-2">Admin Dashboard</h1>
         <p className="text-textLight mb-8">
           Manage your cricket auctions
         </p>
@@ -241,18 +275,18 @@ export const AdminSetup = () => {
               {existingAuctions.map((auction) => (
                 <div
                   key={auction.id}
-                  className="card border-2 border-border hover:border-primary transition"
+                  className="card card-hover border-2 border-border hover:border-primary transition"
                 >
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-xl font-bold text-primary">
+                  <div className="flex justify-between items-start gap-2 mb-4">
+                    <div className="min-w-0">
+                      <h3 className="text-lg sm:text-xl font-bold text-primary truncate">
                         {auction.name}
                       </h3>
                       <p className="text-sm text-textLight">
                         {auction.date ? new Date(auction.date).toLocaleDateString() : "No date"} | Purse: ₹{(auction.purse_size || 0).toLocaleString()}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       <span className={`text-xs px-2 py-1 rounded-full font-bold ${
                         auction.status === "live" ? "bg-success text-white" :
                         auction.status === "completed" ? "bg-secondary text-primary" :
@@ -318,6 +352,13 @@ export const AdminSetup = () => {
                     >
                       <IoStatsChart size={16} /> Results
                     </button>
+                    <button
+                      onClick={() => setShareAuctionId(auction.id)}
+                      className="btn btn-sm btn-secondary flex items-center gap-1"
+                      title="Share viewer link"
+                    >
+                      <IoShareSocial size={16} /> Share
+                    </button>
                   </div>
 
                   {/* Inline Groups Management */}
@@ -342,17 +383,17 @@ export const AdminSetup = () => {
                           {managedGroupsList.map((group) => (
                             <div
                               key={group.id}
-                              className="flex justify-between items-center p-3 bg-lightBg border border-border rounded-lg"
+                              className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-3 bg-lightBg border border-border rounded-lg"
                             >
-                              <div>
+                              <div className="min-w-0">
                                 <p className="font-semibold text-text text-sm">
                                   {group.group_name}
                                 </p>
-                                <p className="text-xs text-textLight">
-                                  Base: ₹{(group.base_price || 0).toLocaleString()} | Increment: ₹{(group.increment_value || 0).toLocaleString()} | Max: ₹{group.max_bid_cap ? group.max_bid_cap.toLocaleString() : "Unlimited"}{group.max_per_team ? ` | ${group.max_per_team}/team` : ""}
+                                <p className="text-xs text-textLight break-words">
+                                  Base: ₹{(group.base_price || 0).toLocaleString()} | Inc: ₹{(group.increment_value || 0).toLocaleString()} | Max: ₹{group.max_bid_cap ? group.max_bid_cap.toLocaleString() : "∞"}{group.max_per_team ? ` | ${group.max_per_team}/team` : ""}
                                 </p>
                               </div>
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1 flex-shrink-0">
                                 <button
                                   onClick={() => openExistingGroupModal(group)}
                                   className="btn btn-sm btn-secondary"
@@ -554,24 +595,23 @@ export const AdminSetup = () => {
               {groups.map((group) => (
                 <div
                   key={group.id}
-                  className="flex justify-between items-center p-4 bg-lightBg border border-border rounded-lg"
+                  className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-3 sm:p-4 bg-lightBg border border-border rounded-lg"
                 >
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-semibold text-text">
                       {group.group_name}
                     </p>
-                    <p className="text-sm text-textLight">
-                      Base: ₹{group.base_price.toLocaleString()} | Increment: ₹{group.increment_value.toLocaleString()} | Max
-                      Price: ₹
+                    <p className="text-xs sm:text-sm text-textLight break-words">
+                      Base: ₹{group.base_price.toLocaleString()} | Inc: ₹{group.increment_value.toLocaleString()} | Max: ₹
                       {group.max_bid_cap
                         ? group.max_bid_cap.toLocaleString()
-                        : "Unlimited"}
+                        : "∞"}
                       {group.max_per_team ? ` | ${group.max_per_team}/team` : ""}
                     </p>
                   </div>
                   <button
                     onClick={() => removeGroup(group.id)}
-                    className="btn btn-danger btn-sm"
+                    className="btn btn-danger btn-sm self-end sm:self-auto flex-shrink-0"
                   >
                     <IoTrash size={16} />
                   </button>
@@ -654,6 +694,24 @@ export const AdminSetup = () => {
               placeholder="e.g., 100000000"
               className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary"
             />
+          </div>
+          <div>
+            <label className="block font-semibold text-text mb-2">
+              Team PIN (for owner access)
+            </label>
+            <input
+              type="text"
+              value={teamForm.pin}
+              onChange={(e) =>
+                setTeamForm({ ...teamForm, pin: e.target.value })
+              }
+              placeholder="e.g., 1234"
+              maxLength={6}
+              className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary"
+            />
+            <p className="text-xs text-textLight mt-1">
+              Team owners use this PIN to access their team view
+            </p>
           </div>
         </div>
       </Modal>
@@ -815,6 +873,54 @@ export const AdminSetup = () => {
             />
           </div>
         </div>
+      </Modal>
+
+      {/* QR Code Share Modal */}
+      <Modal
+        isOpen={!!shareAuctionId}
+        title="Share Auction Link"
+        onClose={() => setShareAuctionId(null)}
+      >
+        {shareAuctionId && (() => {
+          const shareUrl = `${window.location.origin}/auction/${shareAuctionId}`;
+          const auction = existingAuctions.find(
+            (a) => String(a.id) === String(shareAuctionId)
+          );
+          return (
+            <div className="text-center">
+              <p className="text-text font-bold mb-4">{auction?.name}</p>
+              <div className="flex justify-center mb-4">
+                <QRCodeSVG
+                  value={shareUrl}
+                  size={200}
+                  bgColor="#ffffff"
+                  fgColor="#1a3a52"
+                  level="M"
+                />
+              </div>
+              <p className="text-sm text-textLight mb-3">
+                Scan this QR code to open the viewer dashboard
+              </p>
+              <div className="flex items-center gap-2 bg-lightBg border border-border rounded-lg p-3">
+                <input
+                  type="text"
+                  readOnly
+                  value={shareUrl}
+                  className="flex-1 bg-transparent text-sm text-text outline-none truncate"
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(shareUrl);
+                    showToast("Link copied to clipboard!", "success");
+                  }}
+                  className="btn btn-sm btn-primary flex items-center gap-1"
+                >
+                  <IoCopy size={14} /> Copy
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </Modal>
 
       {/* Toast Notifications */}

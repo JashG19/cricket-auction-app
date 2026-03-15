@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useRealtimeData } from "../../hooks/useRealtimeData";
 import { firebaseObjectToArray, createLookupMap, calculateSpentBudget } from "../../utils/dataTransformUtils";
@@ -9,7 +9,7 @@ export const TeamDetails = () => {
   const { auctionId } = useParams();
 
   // Real-time data
-  const { data: auctionData } = useRealtimeData(`auctions/${auctionId}`);
+  const { data: auctionData, loading: auctionLoading, error: auctionError } = useRealtimeData(`auctions/${auctionId}`);
   const { data: playersData } = useRealtimeData(
     `auctions/${auctionId}/players`,
   );
@@ -24,21 +24,27 @@ export const TeamDetails = () => {
   // Lookup maps for O(1) access
   const groupsById = useMemo(() => createLookupMap(groupsList), [groupsList]);
 
-  // Sort teams by spending
-  const sortedTeams = [...teamsList].sort(
-    (a, b) => calculateSpentBudget(b) - calculateSpentBudget(a),
+  // Sort teams by spending (memoized)
+  const sortedTeams = useMemo(
+    () => [...teamsList].sort(
+      (a, b) => calculateSpentBudget(b) - calculateSpentBudget(a),
+    ),
+    [teamsList],
   );
 
-  // Get squad for each team
-  const getTeamSquad = (team) => {
-    return playersList
-      .filter((p) =>
-        team.squad?.some((playerId) => String(playerId) === String(p.id)),
-      )
-      .sort((a, b) => (b.soldPrice || 0) - (a.soldPrice || 0));
-  };
+  // Build a map from playerId -> player for O(1) squad lookups
+  const playersById = useMemo(() => createLookupMap(playersList), [playersList]);
 
-  if (!auctionData) {
+  // Get squad for a team (uses map for O(1) lookups)
+  const getTeamSquad = useCallback((team) => {
+    if (!team.squad) return [];
+    return team.squad
+      .map((pid) => playersById.get(String(pid)))
+      .filter(Boolean)
+      .sort((a, b) => (b.soldPrice || 0) - (a.soldPrice || 0));
+  }, [playersById]);
+
+  if (auctionLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-lightBg">
         <div className="text-center">
@@ -49,21 +55,35 @@ export const TeamDetails = () => {
     );
   }
 
+  if (!auctionData || auctionError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-lightBg">
+        <div className="text-center">
+          <p className="text-2xl font-bold text-primary mb-2">Auction Not Found</p>
+          <p className="text-textLight mb-6">
+            {auctionError || "This auction does not exist or may have been deleted."}
+          </p>
+          <Link to="/" className="btn btn-primary">Back to Home</Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-lightBg p-4">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-lightBg p-3 sm:p-4">
+      <div className="max-w-7xl mx-auto page-enter">
         {/* Header */}
-        <div className="mb-6">
+        <div className="mb-4 sm:mb-6">
           <Link
             to={ROUTES.AUCTION_DASHBOARD(auctionId)}
-            className="inline-flex items-center gap-2 text-primary hover:text-accent mb-4"
+            className="inline-flex items-center gap-2 text-primary hover:text-accent mb-3"
           >
             <IoArrowBack size={20} /> Back to Dashboard
           </Link>
-          <h1 className="text-4xl font-bold text-primary mb-2">
+          <h1 className="text-2xl sm:text-4xl font-bold text-primary mb-1">
             {auctionData?.name} - Team Details
           </h1>
-          <p className="text-textLight">
+          <p className="text-textLight text-sm">
             Detailed squad information for all teams
           </p>
         </div>
@@ -73,48 +93,50 @@ export const TeamDetails = () => {
           {sortedTeams.map((team, idx) => {
             const squad = getTeamSquad(team);
             const spent = calculateSpentBudget(team);
-            const spentPercent = (spent / team.budget_total) * 100;
+            const budgetTotal = Number(team.budget_total) || 0;
+            const budgetRemaining = Number(team.budget_remaining) || 0;
+            const spentPercent = budgetTotal > 0 ? Math.min(100, (spent / budgetTotal) * 100) : 0;
 
             return (
-              <div key={team.id} className="card">
+              <div key={team.id} className="card card-hover">
                 {/* Team Header */}
-                <div className="border-b border-border pb-6 mb-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h2 className="text-3xl font-bold text-primary mb-2">
+                <div className="border-b border-border pb-4 sm:pb-6 mb-4 sm:mb-6">
+                  <div className="flex justify-between items-start gap-2 mb-4">
+                    <div className="min-w-0">
+                      <h2 className="text-xl sm:text-3xl font-bold text-primary mb-1 sm:mb-2 truncate">
                         #{idx + 1} {team.team_name}
                       </h2>
-                      <p className="text-lg text-textLight">
+                      <p className="text-sm sm:text-lg text-textLight">
                         Owner: {team.owner_name}
                       </p>
                     </div>
-                    <span className="bg-primary text-white text-3xl px-4 py-2 rounded-lg font-bold">
+                    <span className="bg-primary text-white text-xl sm:text-3xl px-3 sm:px-4 py-1 sm:py-2 rounded-lg font-bold flex-shrink-0">
                       {squad.length}
                     </span>
                   </div>
 
                   {/* Budget Info */}
-                  <div className="grid md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-3 gap-3 sm:gap-4">
                     <div>
-                      <p className="text-textLight text-sm mb-1">
+                      <p className="text-textLight text-xs sm:text-sm mb-1">
                         Total Budget
                       </p>
-                      <p className="text-2xl font-bold text-text">
-                        ₹{team.budget_total.toLocaleString()}
+                      <p className="text-lg sm:text-2xl font-bold text-text">
+                        ₹{budgetTotal.toLocaleString()}
                       </p>
                     </div>
                     <div>
-                      <p className="text-textLight text-sm mb-1">Spent</p>
-                      <p className="text-2xl font-bold text-secondary">
+                      <p className="text-textLight text-xs sm:text-sm mb-1">Spent</p>
+                      <p className="text-lg sm:text-2xl font-bold text-secondary">
                         ₹{spent.toLocaleString()}
                       </p>
                     </div>
                     <div>
-                      <p className="text-textLight text-sm mb-1">Remaining</p>
+                      <p className="text-textLight text-xs sm:text-sm mb-1">Remaining</p>
                       <p
-                        className={`text-2xl font-bold ${team.budget_remaining > 0 ? "text-success" : "text-danger"}`}
+                        className={`text-lg sm:text-2xl font-bold ${budgetRemaining > 0 ? "text-success" : "text-danger"}`}
                       >
-                        ₹{team.budget_remaining.toLocaleString()}
+                        ₹{budgetRemaining.toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -143,7 +165,7 @@ export const TeamDetails = () => {
                   </p>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full">
+                    <table className="w-full table-improved">
                       <thead>
                         <tr className="border-b-2 border-border">
                           <th className="text-left py-4 px-4 font-bold text-primary">
@@ -209,21 +231,21 @@ export const TeamDetails = () => {
 
                 {/* Squad Stats */}
                 {squad.length > 0 && (
-                  <div className="mt-6 pt-6 border-t border-border">
-                    <div className="grid md:grid-cols-4 gap-4">
+                  <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-border">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                       <div className="text-center">
-                        <p className="text-textLight text-sm mb-1">
+                        <p className="text-textLight text-xs sm:text-sm mb-1">
                           Total Players
                         </p>
-                        <p className="text-2xl font-bold text-primary">
+                        <p className="text-xl sm:text-2xl font-bold text-primary">
                           {squad.length}
                         </p>
                       </div>
                       <div className="text-center">
-                        <p className="text-textLight text-sm mb-1">
+                        <p className="text-textLight text-xs sm:text-sm mb-1">
                           Average Price
                         </p>
-                        <p className="text-2xl font-bold text-accent">
+                        <p className="text-xl sm:text-2xl font-bold text-accent">
                           ₹
                           {(
                             squad.reduce(
@@ -234,10 +256,10 @@ export const TeamDetails = () => {
                         </p>
                       </div>
                       <div className="text-center">
-                        <p className="text-textLight text-sm mb-1">
+                        <p className="text-textLight text-xs sm:text-sm mb-1">
                           Total Spent on Squad
                         </p>
-                        <p className="text-2xl font-bold text-secondary">
+                        <p className="text-xl sm:text-2xl font-bold text-secondary">
                           ₹
                           {squad
                             .reduce((sum, p) => sum + (p.soldPrice || 0), 0)
@@ -245,7 +267,7 @@ export const TeamDetails = () => {
                         </p>
                       </div>
                       <div className="text-center">
-                        <p className="text-textLight text-sm mb-1">
+                        <p className="text-textLight text-xs sm:text-sm mb-1">
                           Most Expensive
                         </p>
                         <p className="text-xs font-bold text-text">

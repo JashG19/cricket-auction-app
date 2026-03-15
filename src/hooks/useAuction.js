@@ -176,7 +176,7 @@ export const useAuction = () => {
         const team = teamSnapshot.val();
 
         const updatedSquad = [...(team.squad || []), playerId];
-        const newBudgetRemaining = team.budget_remaining - soldPrice;
+        const newBudgetRemaining = Number(team.budget_remaining || 0) - Number(soldPrice);
 
         await update(teamRef, {
           squad: updatedSquad,

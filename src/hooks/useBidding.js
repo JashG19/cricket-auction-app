@@ -42,12 +42,12 @@ export const useBidding = (auctionId, playerId) => {
   );
 
   const decrementBid = useCallback(
-    async (decrement) => {
+    async (decrement, basePrice = 0) => {
       try {
         setLoading(true);
         setError(null);
 
-        const newBid = Math.max(0, currentBid - decrement);
+        const newBid = Math.max(basePrice, currentBid - decrement);
         setCurrentBid(newBid);
         setBidHistory((prev) => [...prev, { amount: newBid, action: "decrement", timestamp: new Date().toISOString() }]);
         return newBid;

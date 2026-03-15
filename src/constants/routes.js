@@ -17,4 +17,6 @@ export const ROUTES = {
   AUCTION_DASHBOARD: (auctionId) => `/auction/${auctionId}`,
   TEAM_DETAILS: (auctionId) => `/auction/${auctionId}/teams`,
   PLAYER_POOL: (auctionId) => `/auction/${auctionId}/players`,
+  TEAM_OWNER: (auctionId, teamId) => `/auction/${auctionId}/team/${teamId}`,
+  PROJECTOR: (auctionId) => `/auction/${auctionId}/projector`,
 };
