@@ -47,6 +47,10 @@ export const validateGroup = (groupData) => {
     errors.group_name = "Group name is required";
   }
 
+  if (!groupData.base_price || groupData.base_price <= 0) {
+    errors.base_price = "Base price must be greater than 0";
+  }
+
   if (!groupData.increment_value || groupData.increment_value <= 0) {
     errors.increment_value = "Increment value must be greater than 0";
   }
@@ -71,10 +75,6 @@ export const validatePlayer = (playerData) => {
 
   if (!playerData.group_id) {
     errors.group_id = "Player group is required";
-  }
-
-  if (playerData.base_price === undefined || playerData.base_price < 0) {
-    errors.base_price = "Valid base price is required";
   }
 
   return Object.keys(errors).length === 0 ? null : errors;
@@ -112,7 +112,7 @@ export const validateCSVData = (data) => {
     return "CSV must contain at least one row";
   }
 
-  const requiredFields = ["player_name", "age", "group_id", "base_price"];
+  const requiredFields = ["player_name", "age"];
   const firstRow = data[0];
 
   for (const field of requiredFields) {

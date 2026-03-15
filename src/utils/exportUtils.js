@@ -159,10 +159,8 @@ export const exportTeamSquads = (
       const squadData = teamPlayers.map((player) => ({
         "Player Name": player.player_name,
         Age: player.age,
-        Role: player.role || "-",
         Group: player.group_name,
         "Sold Price": player.soldPrice,
-        Nationality: player.nationality || "-",
       }));
 
       const sheet = XLSX.utils.json_to_sheet(squadData);

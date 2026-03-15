@@ -1,0 +1,30 @@
+{
+  "rules": {
+    "auctions": {
+      // Anyone can read auction data (viewers need this)
+      ".read": true,
+
+      "$auctionId": {
+        // Only authenticated admin can write auction data
+        ".write": "auth != null && auth.token.email === 'jashgandhi46@gmail.com'",
+
+        "players": {
+          ".read": true,
+          ".write": "auth != null && auth.token.email === 'jashgandhi46@gmail.com'"
+        },
+        "teams": {
+          ".read": true,
+          ".write": "auth != null && auth.token.email === 'jashgandhi46@gmail.com'"
+        },
+        "groups": {
+          ".read": true,
+          ".write": "auth != null && auth.token.email === 'jashgandhi46@gmail.com'"
+        },
+        "bidding": {
+          ".read": true,
+          ".write": "auth != null && auth.token.email === 'jashgandhi46@gmail.com'"
+        }
+      }
+    }
+  }
+}

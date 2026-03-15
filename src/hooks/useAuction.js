@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { ref, set, push, get, update } from "firebase/database";
+import { ref, set, push, get, update, remove } from "firebase/database";
 import { db } from "../utils/firebaseConfig";
 
 export const useAuction = () => {
@@ -102,6 +102,36 @@ export const useAuction = () => {
     }
   }, []);
 
+  const deletePlayer = useCallback(async (auctionId, playerId) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const playerRef = ref(db, `auctions/${auctionId}/players/${playerId}`);
+      await remove(playerRef);
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const updatePlayer = useCallback(async (auctionId, playerId, playerData) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const playerRef = ref(db, `auctions/${auctionId}/players/${playerId}`);
+      await update(playerRef, playerData);
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const updateAuction = useCallback(async (auctionId, updates) => {
     try {
       setLoading(true);
@@ -169,6 +199,51 @@ export const useAuction = () => {
     [],
   );
 
+  const deleteAuction = useCallback(async (auctionId) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const auctionRef = ref(db, `auctions/${auctionId}`);
+      await remove(auctionRef);
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const updateGroup = useCallback(async (auctionId, groupId, groupData) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const groupRef = ref(db, `auctions/${auctionId}/groups/${groupId}`);
+      await update(groupRef, groupData);
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const deleteGroup = useCallback(async (auctionId, groupId) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const groupRef = ref(db, `auctions/${auctionId}/groups/${groupId}`);
+      await remove(groupRef);
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   return {
     auctions,
     loading,
@@ -177,8 +252,13 @@ export const useAuction = () => {
     addTeam,
     addGroup,
     addPlayer,
+    deletePlayer,
+    updatePlayer,
     updateAuction,
     updateTeamBudget,
     addPlayerToTeam,
+    deleteAuction,
+    updateGroup,
+    deleteGroup,
   };
 };

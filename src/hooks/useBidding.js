@@ -29,6 +29,7 @@ export const useBidding = (auctionId, playerId) => {
         }
 
         setCurrentBid(newBid);
+        setBidHistory((prev) => [...prev, { amount: newBid, action: "increment", timestamp: new Date().toISOString() }]);
         return newBid;
       } catch (err) {
         setError(err.message);
@@ -48,6 +49,7 @@ export const useBidding = (auctionId, playerId) => {
 
         const newBid = Math.max(0, currentBid - decrement);
         setCurrentBid(newBid);
+        setBidHistory((prev) => [...prev, { amount: newBid, action: "decrement", timestamp: new Date().toISOString() }]);
         return newBid;
       } catch (err) {
         setError(err.message);
@@ -94,7 +96,7 @@ export const useBidding = (auctionId, playerId) => {
     }
   }, []);
 
-  const undoLastBid = useCallback(() => {
+  const undoLastBid = useCallback((basePrice = 0) => {
     try {
       setLoading(true);
       setError(null);
@@ -110,7 +112,7 @@ export const useBidding = (auctionId, playerId) => {
       if (newHistory.length > 0) {
         setCurrentBid(newHistory[newHistory.length - 1].amount);
       } else {
-        setCurrentBid(0);
+        setCurrentBid(basePrice);
       }
 
       return newHistory;

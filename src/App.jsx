@@ -6,6 +6,9 @@ import { AdminSetup } from "./pages/admin/AdminSetup";
 import { AdminPlayers } from "./pages/admin/AdminPlayers";
 import { AdminLive } from "./pages/admin/AdminLive";
 import { AdminResults } from "./pages/admin/AdminResults";
+import { AuctionDashboard } from "./pages/viewer/AuctionDashboard";
+import { TeamDetails } from "./pages/viewer/TeamDetails";
+import { PlayerPool } from "./pages/viewer/PlayerPool";
 import { AuthGate } from "./components/AuthGate";
 import "./App.css";
 
@@ -27,7 +30,7 @@ function App() {
           }
         />
         <Route
-          path="/admin/players"
+          path="/admin/players/:auctionId"
           element={
             <AuthGate requireAdmin>
               <AdminPlayers />
@@ -51,33 +54,10 @@ function App() {
           }
         />
 
-        {/* Viewer Routes (placeholder for now) */}
-        <Route
-          path="/auction/:auctionId"
-          element={
-            <div className="min-h-screen flex items-center justify-center">
-              <h1 className="text-4xl font-bold">
-                Auction Dashboard - Coming Soon
-              </h1>
-            </div>
-          }
-        />
-        <Route
-          path="/auction/:auctionId/teams"
-          element={
-            <div className="min-h-screen flex items-center justify-center">
-              <h1 className="text-4xl font-bold">Team Details - Coming Soon</h1>
-            </div>
-          }
-        />
-        <Route
-          path="/auction/:auctionId/players"
-          element={
-            <div className="min-h-screen flex items-center justify-center">
-              <h1 className="text-4xl font-bold">Player Pool - Coming Soon</h1>
-            </div>
-          }
-        />
+        {/* Viewer Routes */}
+        <Route path="/auction/:auctionId" element={<AuctionDashboard />} />
+        <Route path="/auction/:auctionId/teams" element={<TeamDetails />} />
+        <Route path="/auction/:auctionId/players" element={<PlayerPool />} />
 
         {/* 404 Not Found */}
         <Route path="*" element={<NotFound />} />

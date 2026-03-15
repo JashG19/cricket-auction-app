@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../components/Toast";
+import { ROUTES } from "../constants/routes";
 
 export const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -18,7 +19,7 @@ export const LoginPage = () => {
     try {
       await login(email, password);
       showToast("Login successful!", "success");
-      navigate("/admin/setup");
+      navigate(ROUTES.ADMIN_SETUP);
     } catch (error) {
       showToast(error.message || "Login failed", "error");
     } finally {
@@ -76,7 +77,7 @@ export const LoginPage = () => {
         {/* Back Link */}
         <div className="mt-6 text-center">
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate(ROUTES.HOME)}
             className="text-primary hover:text-accent font-semibold transition"
           >
             ← Back to Home

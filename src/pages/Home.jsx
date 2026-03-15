@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { ROUTES } from "../constants/routes";
 
 export const Home = () => {
   const navigate = useNavigate();
@@ -7,9 +8,9 @@ export const Home = () => {
 
   const handleAdminClick = () => {
     if (isAdmin) {
-      navigate("/admin/setup");
+      navigate(ROUTES.ADMIN_SETUP);
     } else {
-      navigate("/login");
+      navigate(ROUTES.LOGIN);
     }
   };
 

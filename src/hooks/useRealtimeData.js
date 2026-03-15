@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ref, onValue, off } from "firebase/database";
+import { ref, onValue } from "firebase/database";
 import { db } from "../utils/firebaseConfig";
 
 export const useRealtimeData = (path) => {
@@ -33,7 +33,6 @@ export const useRealtimeData = (path) => {
     );
 
     return () => {
-      off(dataRef);
       unsubscribe();
     };
   }, [path]);

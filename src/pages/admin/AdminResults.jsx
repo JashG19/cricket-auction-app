@@ -1,18 +1,19 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useRealtimeData } from "../../hooks/useRealtimeData";
 import { useToast } from "../../components/Toast";
+import { ToastContainer } from "../../components/ToastContainer";
 import {
   exportToCSV,
   exportToExcel,
-  generateAuctionSummary,
 } from "../../utils/exportUtils";
+import { firebaseObjectToArray, createLookupMap, calculateSpentBudget } from "../../utils/dataTransformUtils";
 import { IoDownload, IoArrowBack } from "react-icons/io5";
 
 export const AdminResults = () => {
   const { auctionId } = useParams();
   const navigate = useNavigate();
-  const { showToast } = useToast();
+  const { toasts, showToast, removeToast } = useToast();
 
   const { data: auctionData } = useRealtimeData(`auctions/${auctionId}`);
   const { data: playersData } = useRealtimeData(
@@ -21,33 +22,32 @@ export const AdminResults = () => {
   const { data: teamsData } = useRealtimeData(`auctions/${auctionId}/teams`);
   const { data: groupsData } = useRealtimeData(`auctions/${auctionId}/groups`);
 
-  const playersList = playersData
-    ? Object.entries(playersData).map(([id, player]) => ({ id, ...player }))
-    : [];
-  const teamsList = teamsData
-    ? Object.entries(teamsData).map(([id, team]) => ({ id, ...team }))
-    : [];
-  const groupsList = groupsData
-    ? Object.entries(groupsData).map(([id, group]) => ({ id, ...group }))
-    : [];
+  const playersList = useMemo(() => firebaseObjectToArray(playersData), [playersData]);
+  const teamsList = useMemo(() => firebaseObjectToArray(teamsData), [teamsData]);
+  const groupsList = useMemo(() => firebaseObjectToArray(groupsData), [groupsData]);
+  const groupsById = useMemo(() => createLookupMap(groupsList), [groupsList]);
 
   // Calculate stats
   const totalPlayers = playersList.length;
   const soldPlayers = playersList.filter((p) => p.soldPrice).length;
   const unsoldPlayers = totalPlayers - soldPlayers;
   const totalSpent = teamsList.reduce(
-    (sum, team) => sum + (team.budget_total - team.budget_remaining),
+    (sum, team) => sum + calculateSpentBudget(team),
     0,
+  );
+
+  // Shared: enrich players with group name for export
+  const playersWithGroup = useMemo(() =>
+    playersList.map((p) => ({
+      ...p,
+      group_name: groupsById.get(String(p.group_id))?.group_name || "N/A",
+    })),
+    [playersList, groupsById],
   );
 
   // Export functions
   const handleExportCSV = () => {
     try {
-      const playersWithGroup = playersList.map((p) => ({
-        ...p,
-        group_name:
-          groupsList.find((g) => g.id === p.group_id)?.group_name || "N/A",
-      }));
       exportToCSV(
         teamsList,
         playersWithGroup,
@@ -55,17 +55,12 @@ export const AdminResults = () => {
       );
       showToast("CSV exported successfully!", "success");
     } catch (error) {
-      showToast("Error exporting CSV: " + error.message, "error");
+      showToast(`Error exporting CSV: ${error.message}`, "error");
     }
   };
 
   const handleExportExcel = () => {
     try {
-      const playersWithGroup = playersList.map((p) => ({
-        ...p,
-        group_name:
-          groupsList.find((g) => g.id === p.group_id)?.group_name || "N/A",
-      }));
       exportToExcel(
         teamsList,
         playersWithGroup,
@@ -73,7 +68,7 @@ export const AdminResults = () => {
       );
       showToast("Excel exported successfully!", "success");
     } catch (error) {
-      showToast("Error exporting Excel: " + error.message, "error");
+      showToast(`Error exporting Excel: ${error.message}`, "error");
     }
   };
 
@@ -181,7 +176,7 @@ export const AdminResults = () => {
               </thead>
               <tbody>
                 {teamsList.map((team) => {
-                  const spent = team.budget_total - team.budget_remaining;
+                  const spent = calculateSpentBudget(team);
                   const spentPercent = (spent / team.budget_total) * 100;
                   return (
                     <tr
@@ -245,9 +240,7 @@ export const AdminResults = () => {
               {playersList
                 .filter((p) => !p.soldPrice)
                 .map((player) => {
-                  const group = groupsList.find(
-                    (g) => g.id === player.group_id,
-                  );
+                  const group = groupsById.get(String(player.group_id));
                   return (
                     <div
                       key={player.id}
@@ -265,7 +258,7 @@ export const AdminResults = () => {
                         </span>
                       </p>
                       <p className="text-sm font-semibold text-primary">
-                        Base: ₹{(player.base_price || 0).toLocaleString()}
+                        Base: ₹{(group?.base_price || 0).toLocaleString()}
                       </p>
                     </div>
                   );
@@ -274,6 +267,9 @@ export const AdminResults = () => {
           </div>
         )}
       </div>
+
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
   );
 };
