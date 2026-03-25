@@ -143,20 +143,50 @@ export const AdminLive = () => {
       // Account for current player being bought, so remaining slots = maxSquadSize - (squadSize + 1)
       // Also account for max_per_team limits of each group
       let minReserveNeeded = 0;
-      if (canAffordBid && remainingGroupsWithLimits.length > 0) {
+      let canCompleteSquad = true;
+      if (canAffordBid) {
         let slotsToFill = Math.max(0, maxSquadSize - squadSize - 1);
-        for (const group of remainingGroupsWithLimits) {
-          if (slotsToFill <= 0) break;
-          // Can buy up to max_per_team players from this group
-          const playersFromThisGroup = Math.min(slotsToFill, group.maxPerTeam);
-          minReserveNeeded += playersFromThisGroup * group.basePrice;
-          slotsToFill -= playersFromThisGroup;
+
+        // First, check remaining slots in the CURRENT group
+        if (currentGroup && slotsToFill > 0) {
+          const currentGroupMaxPerTeam =
+            Number(currentGroup.max_per_team) || Infinity;
+          const groupCount = teamSquadIdMap.get(team.id) || 0;
+          // Account for current player being bought: groupCount will increase by 1
+          const remainingSlotsInCurrentGroup = Math.max(
+            0,
+            currentGroupMaxPerTeam - groupCount - 1,
+          );
+          const slotsInCurrentGroup = Math.min(
+            slotsToFill,
+            remainingSlotsInCurrentGroup,
+          );
+          const currentGroupBasePrice = Number(currentGroup.base_price) || 0;
+          minReserveNeeded += slotsInCurrentGroup * currentGroupBasePrice;
+          slotsToFill -= slotsInCurrentGroup;
         }
+
+        // Then, check remaining slots in future groups
+        if (remainingGroupsWithLimits.length > 0) {
+          for (const group of remainingGroupsWithLimits) {
+            if (slotsToFill <= 0) break;
+            const playersFromThisGroup = Math.min(
+              slotsToFill,
+              group.maxPerTeam,
+            );
+            minReserveNeeded += playersFromThisGroup * group.basePrice;
+            slotsToFill -= playersFromThisGroup;
+          }
+        }
+
+        // Check if team can physically fill remaining slots
+        canCompleteSquad = slotsToFill === 0;
       }
 
       const budgetAfterBid = budgetRemaining - bid;
       const canAffordFutureCommitments =
-        minReserveNeeded === 0 || budgetAfterBid >= minReserveNeeded;
+        (minReserveNeeded === 0 || budgetAfterBid >= minReserveNeeded) &&
+        canCompleteSquad;
 
       const canAfford = canAffordBid && canAffordFutureCommitments;
       const squadFull = squadSize >= maxSquadSize;
@@ -172,7 +202,11 @@ export const AdminLive = () => {
           `Budget ₹${budgetRemaining.toLocaleString()} < Bid ₹${bid.toLocaleString()}`,
         );
       }
-      if (!canAffordFutureCommitments && minReserveNeeded > 0) {
+      if (!canCompleteSquad) {
+        reasons.push(
+          `Cannot complete squad: insufficient players available from remaining groups`,
+        );
+      } else if (!canAffordFutureCommitments && minReserveNeeded > 0) {
         reasons.push(
           `Insufficient reserve for future groups: ₹${budgetAfterBid.toLocaleString()} < ₹${minReserveNeeded.toLocaleString()} required`,
         );
