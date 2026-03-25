@@ -93,33 +93,84 @@ export const AdminLive = () => {
     const groupMaxPerTeam = Number(currentGroup?.max_per_team) || Infinity;
     const currentGroupId = currentGroup ? String(currentGroup.id) : null;
 
+    // Pre-compute reserve calculation once (O(n) instead of O(m*n))
+    let currentGroupIndex = -1;
+    let remainingGroupsBasePrices = [];
+    if (currentGroup && maxSquadSize !== Infinity) {
+      currentGroupIndex = groupsList.findIndex(
+        (g) => String(g.id) === String(currentGroup.id),
+      );
+      if (currentGroupIndex !== -1) {
+        remainingGroupsBasePrices = groupsList
+          .slice(currentGroupIndex + 1)
+          .map((g) => Number(g.base_price) || 0);
+      }
+    }
+
+    // Pre-compute squad ID lookup set (O(n) instead of per-team filter)
+    const teamSquadIdMap = new Map();
+    if (currentGroupId) {
+      const groupPlayerIds = new Set();
+      sortedPlayers.forEach((p) => {
+        if (String(p.group_id) === currentGroupId && p.soldTo) {
+          groupPlayerIds.add(String(p.id));
+        }
+      });
+
+      teamsList.forEach((team) => {
+        const squadIds = new Set((team.squad || []).map(String));
+        let groupCount = 0;
+        squadIds.forEach((id) => {
+          if (groupPlayerIds.has(id)) groupCount++;
+        });
+        teamSquadIdMap.set(team.id, groupCount);
+      });
+    }
+
     return teamsList.map((team) => {
       const squadSize = team.squad?.length || 0;
       const budgetRemaining = Number(team.budget_remaining) || 0;
       const bid = Number(currentBid) || 0;
-      const canAfford = budgetRemaining >= bid;
-      const squadFull = squadSize >= maxSquadSize;
 
-      // Count how many players this team bought from the current group
-      let groupCount = 0;
-      if (currentGroupId) {
-        const teamSquadIds = (team.squad || []).map(String);
-        groupCount = sortedPlayers.filter(
-          (p) =>
-            String(p.group_id) === currentGroupId &&
-            p.soldTo &&
-            teamSquadIds.includes(String(p.id)),
-        ).length;
+      // Check basic affordability
+      const canAffordBid = budgetRemaining >= bid;
+
+      // Calculate future commitment reserve
+      let minReserveNeeded = 0;
+      if (canAffordBid && remainingGroupsBasePrices.length > 0) {
+        const remainingSlotsNeeded = Math.max(0, maxSquadSize - squadSize);
+        for (
+          let i = 0;
+          i < remainingSlotsNeeded && i < remainingGroupsBasePrices.length;
+          i++
+        ) {
+          minReserveNeeded += remainingGroupsBasePrices[i];
+        }
       }
+
+      const budgetAfterBid = budgetRemaining - bid;
+      const canAffordFutureCommitments =
+        minReserveNeeded === 0 || budgetAfterBid >= minReserveNeeded;
+
+      const canAfford = canAffordBid && canAffordFutureCommitments;
+      const squadFull = squadSize >= maxSquadSize;
+      const groupCount = teamSquadIdMap.get(team.id) || 0;
       const groupFull =
         groupMaxPerTeam !== Infinity && groupCount >= groupMaxPerTeam;
 
       const eligible = canAfford && !squadFull && !groupFull;
       const reasons = [];
-      if (!canAfford)
+
+      if (!canAffordBid) {
         reasons.push(
           `Budget ₹${budgetRemaining.toLocaleString()} < Bid ₹${bid.toLocaleString()}`,
         );
+      }
+      if (!canAffordFutureCommitments && minReserveNeeded > 0) {
+        reasons.push(
+          `Insufficient reserve for future groups: ₹${budgetAfterBid.toLocaleString()} < ₹${minReserveNeeded.toLocaleString()} required`,
+        );
+      }
       if (squadFull) reasons.push(`Squad full (${maxSquadSize})`);
       if (groupFull) reasons.push(`Group limit (${groupMaxPerTeam})`);
 
@@ -138,6 +189,7 @@ export const AdminLive = () => {
     currentBid,
     currentGroup,
     sortedPlayers,
+    groupsList,
     auctionData?.max_players_per_team,
   ]);
 
