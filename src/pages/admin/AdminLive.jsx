@@ -658,7 +658,7 @@ export const AdminLive = () => {
         </div>
 
         {/* Main Content */}
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid lg:grid-cols-3 gap-6 lg:items-start">
           {/* Player Card (Left) */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-xl overflow-hidden relative">
@@ -782,7 +782,7 @@ export const AdminLive = () => {
           </div>
 
           {/* Bidding Panel (Center) */}
-          <div className="lg:col-span-1 lg:self-center">
+          <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-xl p-4 sm:p-6 text-center">
               {isPlayerProcessed ? (
                 <div>
