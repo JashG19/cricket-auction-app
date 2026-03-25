@@ -782,7 +782,7 @@ export const AdminLive = () => {
           </div>
 
           {/* Bidding Panel (Center) */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 h-fit">
             <div className="bg-white rounded-lg shadow-xl p-4 sm:p-6 text-center">
               {isPlayerProcessed ? (
                 <div>
