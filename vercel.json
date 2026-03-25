@@ -3,7 +3,11 @@
   "outputDirectory": "dist",
   "routes": [
     {
-      "src": "^/(?!.*\\.[a-z0-9]+$)",
+      "src": "^/(.*\\..*)$",
+      "dest": "/$1"
+    },
+    {
+      "src": "^/(.*)$",
       "dest": "/index.html"
     }
   ]
