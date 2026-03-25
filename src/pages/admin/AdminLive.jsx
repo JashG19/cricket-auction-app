@@ -880,8 +880,8 @@ export const AdminLive = () => {
 
           {/* Teams Sidebar (Right) */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-xl p-3 sm:p-4">
-              <h3 className="text-base sm:text-lg font-bold text-primary mb-3">
+            <div className="bg-white rounded-lg shadow-xl p-3 sm:p-4 max-h-96 overflow-y-auto">
+              <h3 className="text-base sm:text-lg font-bold text-primary mb-3 sticky top-0 bg-white z-10">
                 Teams ({teamsList.length})
               </h3>
               <div className="space-y-1">
