@@ -94,16 +94,20 @@ export const AdminLive = () => {
     const currentGroupId = currentGroup ? String(currentGroup.id) : null;
 
     // Pre-compute reserve calculation once (O(n) instead of O(m*n))
+    // Include both base price and max_per_team for each group
     let currentGroupIndex = -1;
-    let remainingGroupsBasePrices = [];
+    let remainingGroupsWithLimits = [];
     if (currentGroup && maxSquadSize !== Infinity) {
       currentGroupIndex = groupsList.findIndex(
         (g) => String(g.id) === String(currentGroup.id),
       );
       if (currentGroupIndex !== -1) {
-        remainingGroupsBasePrices = groupsList
+        remainingGroupsWithLimits = groupsList
           .slice(currentGroupIndex + 1)
-          .map((g) => Number(g.base_price) || 0);
+          .map((g) => ({
+            basePrice: Number(g.base_price) || 0,
+            maxPerTeam: Number(g.max_per_team) || 1,
+          }));
       }
     }
 
@@ -136,15 +140,17 @@ export const AdminLive = () => {
       const canAffordBid = budgetRemaining >= bid;
 
       // Calculate future commitment reserve
+      // Account for current player being bought, so remaining slots = maxSquadSize - (squadSize + 1)
+      // Also account for max_per_team limits of each group
       let minReserveNeeded = 0;
-      if (canAffordBid && remainingGroupsBasePrices.length > 0) {
-        const remainingSlotsNeeded = Math.max(0, maxSquadSize - squadSize);
-        for (
-          let i = 0;
-          i < remainingSlotsNeeded && i < remainingGroupsBasePrices.length;
-          i++
-        ) {
-          minReserveNeeded += remainingGroupsBasePrices[i];
+      if (canAffordBid && remainingGroupsWithLimits.length > 0) {
+        let slotsToFill = Math.max(0, maxSquadSize - squadSize - 1);
+        for (const group of remainingGroupsWithLimits) {
+          if (slotsToFill <= 0) break;
+          // Can buy up to max_per_team players from this group
+          const playersFromThisGroup = Math.min(slotsToFill, group.maxPerTeam);
+          minReserveNeeded += playersFromThisGroup * group.basePrice;
+          slotsToFill -= playersFromThisGroup;
         }
       }
 
