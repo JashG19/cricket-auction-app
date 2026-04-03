@@ -1,28 +1,50 @@
 import { useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useRealtimeData } from "../../hooks/useRealtimeData";
-import { firebaseObjectToArray, createLookupMap, findPlayerTeam, calculateSpentBudget } from "../../utils/dataTransformUtils";
+import {
+  firebaseObjectToArray,
+  createLookupMap,
+  findPlayerTeam,
+  calculateSpentBudget,
+  getImagePath,
+} from "../../utils/dataTransformUtils";
 import { ROUTES } from "../../constants/routes";
 import { IoArrowBack } from "react-icons/io5";
 import { AnimatedNumber } from "../../components/AnimatedNumber";
+import pcLogo from "/images/PCL Logo.png";
 
 export const AuctionDashboard = () => {
   const { auctionId } = useParams();
   const [selectedGroup, setSelectedGroup] = useState("all");
 
   // Real-time data
-  const { data: auctionData, loading: auctionLoading, error: auctionError } = useRealtimeData(`auctions/${auctionId}`);
+  const {
+    data: auctionData,
+    loading: auctionLoading,
+    error: auctionError,
+  } = useRealtimeData(`auctions/${auctionId}`);
   const { data: playersData } = useRealtimeData(
     `auctions/${auctionId}/players`,
   );
   const { data: teamsData } = useRealtimeData(`auctions/${auctionId}/teams`);
   const { data: groupsData } = useRealtimeData(`auctions/${auctionId}/groups`);
-  const { data: liveState } = useRealtimeData(`auctions/${auctionId}/live_state`);
+  const { data: liveState } = useRealtimeData(
+    `auctions/${auctionId}/live_state`,
+  );
 
   // Transform data with memoization
-  const playersList = useMemo(() => firebaseObjectToArray(playersData), [playersData]);
-  const teamsList = useMemo(() => firebaseObjectToArray(teamsData), [teamsData]);
-  const groupsList = useMemo(() => firebaseObjectToArray(groupsData), [groupsData]);
+  const playersList = useMemo(
+    () => firebaseObjectToArray(playersData),
+    [playersData],
+  );
+  const teamsList = useMemo(
+    () => firebaseObjectToArray(teamsData),
+    [teamsData],
+  );
+  const groupsList = useMemo(
+    () => firebaseObjectToArray(groupsData),
+    [groupsData],
+  );
 
   // Lookup maps for O(1) access
   const groupsById = useMemo(() => createLookupMap(groupsList), [groupsList]);
@@ -30,7 +52,11 @@ export const AuctionDashboard = () => {
   // Get current player from admin's live_state (synced via Firebase)
   const currentPlayer = useMemo(() => {
     if (liveState?.currentPlayerId) {
-      return playersList.find((p) => String(p.id) === String(liveState.currentPlayerId)) || null;
+      return (
+        playersList.find(
+          (p) => String(p.id) === String(liveState.currentPlayerId),
+        ) || null
+      );
     }
     return null;
   }, [liveState?.currentPlayerId, playersList]);
@@ -51,17 +77,17 @@ export const AuctionDashboard = () => {
   const filteredPlayers =
     selectedGroup === "all"
       ? playersList
-      : playersList.filter(
-          (p) => String(p.group_id) === String(selectedGroup),
-        );
+      : playersList.filter((p) => String(p.group_id) === String(selectedGroup));
 
   // Sorted teams for leaderboard (spread to avoid mutating memoized array)
-  const sortedTeams = useMemo(() =>
-    [...teamsList].sort(
-      (a, b) =>
-        (Number(b.budget_total) - Number(b.budget_remaining)) -
-        (Number(a.budget_total) - Number(a.budget_remaining)),
-    ),
+  const sortedTeams = useMemo(
+    () =>
+      [...teamsList].sort(
+        (a, b) =>
+          Number(b.budget_total) -
+          Number(b.budget_remaining) -
+          (Number(a.budget_total) - Number(a.budget_remaining)),
+      ),
     [teamsList],
   );
 
@@ -89,11 +115,16 @@ export const AuctionDashboard = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-lightBg">
         <div className="text-center">
-          <p className="text-2xl font-bold text-primary mb-2">Auction Not Found</p>
-          <p className="text-textLight mb-6">
-            {auctionError || "This auction does not exist or may have been deleted."}
+          <p className="text-2xl font-bold text-primary mb-2">
+            Auction Not Found
           </p>
-          <Link to="/" className="btn btn-primary">Back to Home</Link>
+          <p className="text-textLight mb-6">
+            {auctionError ||
+              "This auction does not exist or may have been deleted."}
+          </p>
+          <Link to="/" className="btn btn-primary">
+            Back to Home
+          </Link>
         </div>
       </div>
     );
@@ -110,12 +141,38 @@ export const AuctionDashboard = () => {
           >
             <IoArrowBack size={20} /> Back
           </Link>
-          <h1 className="text-2xl sm:text-4xl font-bold text-primary mb-1">
-            {auctionData?.name}
-          </h1>
-          <p className="text-textLight text-sm">
-            {isAuctionComplete ? "Auction Complete" : isAuctionPaused ? "Auction Paused" : "Live Auction Dashboard"}
-          </p>
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-white rounded-lg p-1 shadow-md border border-border flex-shrink-0">
+              <img
+                src={pcLogo}
+                alt="PCL 26"
+                className="w-full h-full object-contain"
+              />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-4xl font-bold text-primary mb-1">
+                {auctionData?.name}
+              </h1>
+              <p className="text-textLight text-sm flex items-center gap-2">
+                {isAuctionComplete ? (
+                  <span className="text-success font-semibold">
+                    Auction Complete
+                  </span>
+                ) : isAuctionPaused ? (
+                  <span className="text-yellow-600 font-semibold">
+                    Auction Paused
+                  </span>
+                ) : (
+                  <>
+                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    <span className="text-success font-semibold">
+                      Live Auction
+                    </span>
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Main Grid */}
@@ -128,9 +185,15 @@ export const AuctionDashboard = () => {
                 <div className="relative w-full h-56 sm:h-72 lg:h-80">
                   {currentPlayer.photo_url ? (
                     <img
-                      src={currentPlayer.photo_url}
+                      src={getImagePath(
+                        "player-photo",
+                        currentPlayer.photo_url,
+                      )}
                       alt={currentPlayer.player_name}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = "none";
+                      }}
                     />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
@@ -145,7 +208,9 @@ export const AuctionDashboard = () => {
                       {currentPlayer.player_name}
                     </h2>
                     <div className="flex items-center gap-3">
-                      <span className="text-white/80 text-sm">Age: {currentPlayer.age}</span>
+                      <span className="text-white/80 text-sm">
+                        Age: {currentPlayer.age}
+                      </span>
                       <span className="bg-secondary text-primary px-2 py-0.5 rounded text-xs font-bold">
                         {currentGroup.group_name}
                       </span>
@@ -156,7 +221,12 @@ export const AuctionDashboard = () => {
                 {/* Compact Info */}
                 <div className="p-3 sm:p-4">
                   <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-textLight">Base: <span className="font-bold text-text">₹{(currentGroup.base_price || 0).toLocaleString()}</span></span>
+                    <span className="text-textLight">
+                      Base:{" "}
+                      <span className="font-bold text-text">
+                        ₹{(currentGroup.base_price || 0).toLocaleString()}
+                      </span>
+                    </span>
                   </div>
 
                   {currentPlayer.soldTo && currentTeam && (
@@ -185,7 +255,11 @@ export const AuctionDashboard = () => {
             ) : (
               <div className="card text-center py-8">
                 <p className="text-textLight">
-                  {isAuctionComplete ? "Auction is complete!" : !liveState ? "Waiting for auction to start..." : "No players available"}
+                  {isAuctionComplete
+                    ? "Auction is complete!"
+                    : !liveState
+                      ? "Waiting for auction to start..."
+                      : "No players available"}
                 </p>
               </div>
             )}
@@ -195,11 +269,19 @@ export const AuctionDashboard = () => {
           <div className="lg:col-span-1">
             <div className="bg-gradient-to-br from-primary to-accent rounded-lg shadow-lg p-4 sm:p-8 text-white h-full flex flex-col justify-center items-center text-center">
               <p className="text-base sm:text-lg mb-3 sm:mb-4 opacity-90">
-                {currentPlayer?.soldTo ? "Sold For" : isAuctionPaused ? "Bid (Paused)" : "Current Bid"}
+                {currentPlayer?.soldTo
+                  ? "Sold For"
+                  : isAuctionPaused
+                    ? "Bid (Paused)"
+                    : "Current Bid"}
               </p>
               <div className="mb-4 sm:mb-6 animate-pulse-bid">
                 <AnimatedNumber
-                  value={currentPlayer?.soldTo ? (currentPlayer.soldPrice || 0) : liveBid}
+                  value={
+                    currentPlayer?.soldTo
+                      ? currentPlayer.soldPrice || 0
+                      : liveBid
+                  }
                   className="text-4xl sm:text-6xl font-bold text-secondary"
                 />
               </div>
@@ -211,7 +293,9 @@ export const AuctionDashboard = () => {
               )}
 
               <div className="bg-white bg-opacity-20 rounded-lg p-3 sm:p-4 w-full">
-                <p className="text-sm opacity-90 mb-1 sm:mb-2">Increment Value</p>
+                <p className="text-sm opacity-90 mb-1 sm:mb-2">
+                  Increment Value
+                </p>
                 <p className="text-2xl sm:text-3xl font-bold">
                   ₹{(currentGroup?.increment_value || 0).toLocaleString()}
                 </p>
@@ -230,22 +314,31 @@ export const AuctionDashboard = () => {
 
           {/* Teams Leaderboard (Right) */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 h-full flex flex-col">
-              <h3 className="text-lg sm:text-xl font-bold text-primary mb-4">
+            <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 flex flex-col max-h-[600px]">
+              <h3 className="text-lg sm:text-xl font-bold text-primary mb-4 flex-shrink-0">
                 Teams ({teamsList.length})
               </h3>
-              <div className="flex-1 space-y-2 overflow-y-auto">
+              <div className="flex-1 space-y-2 overflow-y-auto min-h-0">
                 {sortedTeams.map((team, idx) => (
-                    <div
-                      key={team.id}
-                      className="p-3 border-2 border-border rounded-lg hover:border-primary transition card-hover"
-                    >
+                  <div
+                    key={team.id}
+                    className="p-3 border-2 border-border rounded-lg hover:border-primary transition card-hover flex items-start gap-2"
+                  >
+                    {team.team_logo && (
+                      <img
+                        src={getImagePath("team-logo", team.team_logo)}
+                        alt={team.team_name}
+                        className="w-10 h-10 object-contain rounded border border-border flex-shrink-0"
+                        onError={(e) => {
+                          e.target.style.display = "none";
+                        }}
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1.5">
-                        <div className="min-w-0">
-                          <p className="font-bold text-text text-sm truncate">
-                            #{idx + 1} {team.team_name}
-                          </p>
-                        </div>
+                        <p className="font-bold text-text text-sm truncate">
+                          #{idx + 1} {team.team_name}
+                        </p>
                         <span className="bg-primary text-white text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0">
                           {team.squad?.length || 0}
                         </span>
@@ -265,10 +358,12 @@ export const AuctionDashboard = () => {
                       <p
                         className={`text-xs font-bold ${Number(team.budget_remaining) > 0 ? "text-success" : "text-danger"}`}
                       >
-                        ₹{Number(team.budget_remaining || 0).toLocaleString()} remaining
+                        ₹{Number(team.budget_remaining || 0).toLocaleString()}{" "}
+                        remaining
                       </p>
                     </div>
-                  ))}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -277,21 +372,33 @@ export const AuctionDashboard = () => {
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <div className="card card-hover text-center p-4">
-            <p className="text-textLight text-xs sm:text-base mb-1 sm:mb-2">Total Players</p>
+            <p className="text-textLight text-xs sm:text-base mb-1 sm:mb-2">
+              Total Players
+            </p>
             <p className="text-2xl sm:text-4xl font-bold text-primary">
               {playersList.length}
             </p>
           </div>
           <div className="card card-hover text-center p-4">
-            <p className="text-textLight text-xs sm:text-base mb-1 sm:mb-2">Sold Players</p>
-            <p className="text-2xl sm:text-4xl font-bold text-secondary">{soldPlayers}</p>
+            <p className="text-textLight text-xs sm:text-base mb-1 sm:mb-2">
+              Sold Players
+            </p>
+            <p className="text-2xl sm:text-4xl font-bold text-secondary">
+              {soldPlayers}
+            </p>
           </div>
           <div className="card card-hover text-center p-4">
-            <p className="text-textLight text-xs sm:text-base mb-1 sm:mb-2">Unsold Players</p>
-            <p className="text-2xl sm:text-4xl font-bold text-danger">{unsoldPlayers}</p>
+            <p className="text-textLight text-xs sm:text-base mb-1 sm:mb-2">
+              Unsold Players
+            </p>
+            <p className="text-2xl sm:text-4xl font-bold text-danger">
+              {unsoldPlayers}
+            </p>
           </div>
           <div className="card card-hover text-center p-4">
-            <p className="text-textLight text-xs sm:text-base mb-1 sm:mb-2">Total Spent</p>
+            <p className="text-textLight text-xs sm:text-base mb-1 sm:mb-2">
+              Total Spent
+            </p>
             <p className="text-xl sm:text-3xl font-bold text-accent">
               ₹{totalSpent.toLocaleString()}
             </p>
@@ -304,16 +411,24 @@ export const AuctionDashboard = () => {
             to={ROUTES.TEAM_DETAILS(auctionId)}
             className="card card-hover p-4 sm:p-6 hover:shadow-lg transition cursor-pointer bg-gradient-to-br from-primary to-darkBg text-white"
           >
-            <h3 className="text-xl sm:text-2xl font-bold mb-2">View Team Details</h3>
-            <p className="text-gray-200 text-sm">See detailed squad information</p>
+            <h3 className="text-xl sm:text-2xl font-bold mb-2">
+              View Team Details
+            </h3>
+            <p className="text-gray-200 text-sm">
+              See detailed squad information
+            </p>
           </Link>
 
           <Link
             to={ROUTES.PLAYER_POOL(auctionId)}
             className="card card-hover p-4 sm:p-6 hover:shadow-lg transition cursor-pointer bg-gradient-to-br from-accent to-secondary text-white"
           >
-            <h3 className="text-xl sm:text-2xl font-bold mb-2">Browse Player Pool</h3>
-            <p className="text-gray-200 text-sm">Search and filter all players</p>
+            <h3 className="text-xl sm:text-2xl font-bold mb-2">
+              Browse Player Pool
+            </h3>
+            <p className="text-gray-200 text-sm">
+              Search and filter all players
+            </p>
           </Link>
         </div>
 
@@ -346,7 +461,9 @@ export const AuctionDashboard = () => {
               {filteredPlayers.map((player) => {
                 const group = groupsById.get(String(player.group_id));
                 const team = player.soldTo
-                  ? teamsList.find((t) => String(t.id) === String(player.soldTo))
+                  ? teamsList.find(
+                      (t) => String(t.id) === String(player.soldTo),
+                    )
                   : null;
 
                 return (
@@ -374,8 +491,22 @@ export const AuctionDashboard = () => {
                     </p>
 
                     {player.soldTo ? (
-                      <div className="text-xs bg-success text-white p-2 rounded text-center">
-                        <p>Sold to {team?.team_name || "Unknown"}</p>
+                      <div className="text-xs bg-success text-white p-2 rounded">
+                        <div className="flex items-center gap-2 mb-1">
+                          {team?.team_logo && (
+                            <img
+                              src={getImagePath("team-logo", team.team_logo)}
+                              alt={team?.team_name}
+                              className="w-6 h-6 object-contain rounded"
+                              onError={(e) => {
+                                e.target.style.display = "none";
+                              }}
+                            />
+                          )}
+                          <span className="truncate">
+                            Sold to {team?.team_name || "Unknown"}
+                          </span>
+                        </div>
                         <p className="font-bold">
                           ₹{(player.soldPrice || 0).toLocaleString()}
                         </p>

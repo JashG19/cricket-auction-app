@@ -5,6 +5,7 @@ import {
   firebaseObjectToArray,
   createLookupMap,
   calculateSpentBudget,
+  getImagePath,
 } from "../../utils/dataTransformUtils";
 import { ROUTES } from "../../constants/routes";
 import { IoArrowBack, IoLockClosed } from "react-icons/io5";
@@ -27,14 +28,27 @@ export const TeamOwnerView = () => {
   const { data: teamData, loading: teamLoading } = useRealtimeData(
     `auctions/${auctionId}/teams/${teamId}`,
   );
-  const { data: playersData } = useRealtimeData(`auctions/${auctionId}/players`);
+  const { data: playersData } = useRealtimeData(
+    `auctions/${auctionId}/players`,
+  );
   const { data: groupsData } = useRealtimeData(`auctions/${auctionId}/groups`);
-  const { data: liveState } = useRealtimeData(`auctions/${auctionId}/live_state`);
+  const { data: liveState } = useRealtimeData(
+    `auctions/${auctionId}/live_state`,
+  );
   const { data: auctionData } = useRealtimeData(`auctions/${auctionId}`);
 
-  const playersList = useMemo(() => firebaseObjectToArray(playersData), [playersData]);
-  const groupsList = useMemo(() => firebaseObjectToArray(groupsData), [groupsData]);
-  const playersById = useMemo(() => createLookupMap(playersList), [playersList]);
+  const playersList = useMemo(
+    () => firebaseObjectToArray(playersData),
+    [playersData],
+  );
+  const groupsList = useMemo(
+    () => firebaseObjectToArray(groupsData),
+    [groupsData],
+  );
+  const playersById = useMemo(
+    () => createLookupMap(playersList),
+    [playersList],
+  );
   const groupsById = useMemo(() => createLookupMap(groupsList), [groupsList]);
 
   // Resolve current live player
@@ -56,9 +70,15 @@ export const TeamOwnerView = () => {
 
   // Squad stats
   const squadStats = useMemo(() => {
-    if (squad.length === 0) return { total: 0, avgPrice: 0, totalSpent: 0, mostExpensive: null };
-    const totalSpent = squad.reduce((sum, p) => sum + (Number(p.soldPrice) || 0), 0);
-    const sorted = [...squad].sort((a, b) => (Number(b.soldPrice) || 0) - (Number(a.soldPrice) || 0));
+    if (squad.length === 0)
+      return { total: 0, avgPrice: 0, totalSpent: 0, mostExpensive: null };
+    const totalSpent = squad.reduce(
+      (sum, p) => sum + (Number(p.soldPrice) || 0),
+      0,
+    );
+    const sorted = [...squad].sort(
+      (a, b) => (Number(b.soldPrice) || 0) - (Number(a.soldPrice) || 0),
+    );
     return {
       total: squad.length,
       avgPrice: Math.round(totalSpent / squad.length),
@@ -126,13 +146,8 @@ export const TeamOwnerView = () => {
               className="w-full px-4 py-3 border-2 border-border rounded-lg text-center text-2xl tracking-widest font-bold focus:outline-none focus:border-primary mb-3"
               autoFocus
             />
-            {pinError && (
-              <p className="text-danger text-sm mb-3">{pinError}</p>
-            )}
-            <button
-              type="submit"
-              className="w-full btn btn-primary btn-lg"
-            >
+            {pinError && <p className="text-danger text-sm mb-3">{pinError}</p>}
+            <button type="submit" className="w-full btn btn-primary btn-lg">
               Access Dashboard
             </button>
           </form>
@@ -217,9 +232,12 @@ export const TeamOwnerView = () => {
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <p className="font-bold text-text text-lg">{currentLivePlayer.player_name}</p>
+                <p className="font-bold text-text text-lg">
+                  {currentLivePlayer.player_name}
+                </p>
                 <p className="text-sm text-textLight">
-                  Age: {currentLivePlayer.age} | {currentLiveGroup?.group_name || "Unknown Group"}
+                  Age: {currentLivePlayer.age} |{" "}
+                  {currentLiveGroup?.group_name || "Unknown Group"}
                 </p>
               </div>
               <div className="text-right">
@@ -241,7 +259,11 @@ export const TeamOwnerView = () => {
         {/* Squad Table */}
         <div className="card mb-6">
           <h2 className="text-xl sm:text-2xl font-bold text-primary mb-4">
-            Your Squad ({squad.length}{auctionData?.max_players_per_team ? `/${auctionData.max_players_per_team}` : ""})
+            Your Squad ({squad.length}
+            {auctionData?.max_players_per_team
+              ? `/${auctionData.max_players_per_team}`
+              : ""}
+            )
           </h2>
 
           {squad.length === 0 ? (
@@ -251,36 +273,61 @@ export const TeamOwnerView = () => {
               <table className="w-full table-improved">
                 <thead>
                   <tr className="border-b-2 border-border">
-                    <th className="text-left py-3 px-3 font-bold text-primary text-sm">#</th>
-                    <th className="text-left py-3 px-3 font-bold text-primary text-sm">Player</th>
-                    <th className="text-left py-3 px-3 font-bold text-primary text-sm">Age</th>
-                    <th className="text-left py-3 px-3 font-bold text-primary text-sm">Group</th>
-                    <th className="text-right py-3 px-3 font-bold text-primary text-sm">Price</th>
+                    <th className="text-left py-3 px-3 font-bold text-primary text-sm">
+                      #
+                    </th>
+                    <th className="text-left py-3 px-3 font-bold text-primary text-sm">
+                      Player
+                    </th>
+                    <th className="text-left py-3 px-3 font-bold text-primary text-sm">
+                      Age
+                    </th>
+                    <th className="text-left py-3 px-3 font-bold text-primary text-sm">
+                      Group
+                    </th>
+                    <th className="text-right py-3 px-3 font-bold text-primary text-sm">
+                      Price
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {squad.map((player, idx) => {
                     const group = groupsById.get(String(player.group_id));
                     return (
-                      <tr key={player.id} className="border-b border-border hover:bg-gray-50">
-                        <td className="py-3 px-3 text-textLight text-sm">{idx + 1}</td>
+                      <tr
+                        key={player.id}
+                        className="border-b border-border hover:bg-gray-50"
+                      >
+                        <td className="py-3 px-3 text-textLight text-sm">
+                          {idx + 1}
+                        </td>
                         <td className="py-3 px-3">
                           <div className="flex items-center gap-2">
                             {player.photo_url ? (
                               <img
-                                src={player.photo_url}
+                                src={getImagePath(
+                                  "player-photo",
+                                  player.photo_url,
+                                )}
                                 alt={player.player_name}
                                 className="w-8 h-8 rounded-full object-cover"
+                                onError={(e) => {
+                                  e.target.style.display = "none";
+                                }}
                               />
                             ) : (
                               <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs text-textLight">
                                 {player.player_name?.charAt(0)}
                               </div>
                             )}
-                            <span className="font-semibold text-text text-sm">{player.player_name}</span>
+                            <span className="font-semibold text-text text-sm">
+                              {player.player_name}
+                            </span>
                           </div>
                         </td>
-                        <td className="py-3 px-3 text-text text-sm">{player.age}</td>
+                        <td className="py-3 px-3 text-text text-sm">
+                          {player.age}
+                        </td>
                         <td className="py-3 px-3">
                           <span className="text-xs bg-secondary text-primary px-2 py-1 rounded font-bold">
                             {group?.group_name || "N/A"}
@@ -302,23 +349,33 @@ export const TeamOwnerView = () => {
         {squad.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <div className="card card-hover text-center p-4">
-              <p className="text-textLight text-xs sm:text-sm mb-1">Total Players</p>
-              <p className="text-xl sm:text-2xl font-bold text-primary">{squadStats.total}</p>
+              <p className="text-textLight text-xs sm:text-sm mb-1">
+                Total Players
+              </p>
+              <p className="text-xl sm:text-2xl font-bold text-primary">
+                {squadStats.total}
+              </p>
             </div>
             <div className="card card-hover text-center p-4">
-              <p className="text-textLight text-xs sm:text-sm mb-1">Avg Price</p>
+              <p className="text-textLight text-xs sm:text-sm mb-1">
+                Avg Price
+              </p>
               <p className="text-xl sm:text-2xl font-bold text-primary">
                 ₹{squadStats.avgPrice.toLocaleString()}
               </p>
             </div>
             <div className="card card-hover text-center p-4">
-              <p className="text-textLight text-xs sm:text-sm mb-1">Total Spent</p>
+              <p className="text-textLight text-xs sm:text-sm mb-1">
+                Total Spent
+              </p>
               <p className="text-xl sm:text-2xl font-bold text-secondary">
                 ₹{squadStats.totalSpent.toLocaleString()}
               </p>
             </div>
             <div className="card card-hover text-center p-4">
-              <p className="text-textLight text-xs sm:text-sm mb-1">Most Expensive</p>
+              <p className="text-textLight text-xs sm:text-sm mb-1">
+                Most Expensive
+              </p>
               <p className="text-sm sm:text-base font-bold text-primary truncate">
                 {squadStats.mostExpensive?.player_name || "-"}
               </p>

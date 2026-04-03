@@ -1,7 +1,12 @@
 import { useMemo, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useRealtimeData } from "../../hooks/useRealtimeData";
-import { firebaseObjectToArray, createLookupMap, calculateSpentBudget } from "../../utils/dataTransformUtils";
+import {
+  firebaseObjectToArray,
+  createLookupMap,
+  calculateSpentBudget,
+  getImagePath,
+} from "../../utils/dataTransformUtils";
 import { ROUTES } from "../../constants/routes";
 import { IoArrowBack } from "react-icons/io5";
 
@@ -9,7 +14,11 @@ export const TeamDetails = () => {
   const { auctionId } = useParams();
 
   // Real-time data
-  const { data: auctionData, loading: auctionLoading, error: auctionError } = useRealtimeData(`auctions/${auctionId}`);
+  const {
+    data: auctionData,
+    loading: auctionLoading,
+    error: auctionError,
+  } = useRealtimeData(`auctions/${auctionId}`);
   const { data: playersData } = useRealtimeData(
     `auctions/${auctionId}/players`,
   );
@@ -17,32 +26,48 @@ export const TeamDetails = () => {
   const { data: groupsData } = useRealtimeData(`auctions/${auctionId}/groups`);
 
   // Transform data with memoization
-  const playersList = useMemo(() => firebaseObjectToArray(playersData), [playersData]);
-  const teamsList = useMemo(() => firebaseObjectToArray(teamsData), [teamsData]);
-  const groupsList = useMemo(() => firebaseObjectToArray(groupsData), [groupsData]);
+  const playersList = useMemo(
+    () => firebaseObjectToArray(playersData),
+    [playersData],
+  );
+  const teamsList = useMemo(
+    () => firebaseObjectToArray(teamsData),
+    [teamsData],
+  );
+  const groupsList = useMemo(
+    () => firebaseObjectToArray(groupsData),
+    [groupsData],
+  );
 
   // Lookup maps for O(1) access
   const groupsById = useMemo(() => createLookupMap(groupsList), [groupsList]);
 
   // Sort teams by spending (memoized)
   const sortedTeams = useMemo(
-    () => [...teamsList].sort(
-      (a, b) => calculateSpentBudget(b) - calculateSpentBudget(a),
-    ),
+    () =>
+      [...teamsList].sort(
+        (a, b) => calculateSpentBudget(b) - calculateSpentBudget(a),
+      ),
     [teamsList],
   );
 
   // Build a map from playerId -> player for O(1) squad lookups
-  const playersById = useMemo(() => createLookupMap(playersList), [playersList]);
+  const playersById = useMemo(
+    () => createLookupMap(playersList),
+    [playersList],
+  );
 
   // Get squad for a team (uses map for O(1) lookups)
-  const getTeamSquad = useCallback((team) => {
-    if (!team.squad) return [];
-    return team.squad
-      .map((pid) => playersById.get(String(pid)))
-      .filter(Boolean)
-      .sort((a, b) => (b.soldPrice || 0) - (a.soldPrice || 0));
-  }, [playersById]);
+  const getTeamSquad = useCallback(
+    (team) => {
+      if (!team.squad) return [];
+      return team.squad
+        .map((pid) => playersById.get(String(pid)))
+        .filter(Boolean)
+        .sort((a, b) => (b.soldPrice || 0) - (a.soldPrice || 0));
+    },
+    [playersById],
+  );
 
   if (auctionLoading) {
     return (
@@ -59,11 +84,16 @@ export const TeamDetails = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-lightBg">
         <div className="text-center">
-          <p className="text-2xl font-bold text-primary mb-2">Auction Not Found</p>
-          <p className="text-textLight mb-6">
-            {auctionError || "This auction does not exist or may have been deleted."}
+          <p className="text-2xl font-bold text-primary mb-2">
+            Auction Not Found
           </p>
-          <Link to="/" className="btn btn-primary">Back to Home</Link>
+          <p className="text-textLight mb-6">
+            {auctionError ||
+              "This auction does not exist or may have been deleted."}
+          </p>
+          <Link to="/" className="btn btn-primary">
+            Back to Home
+          </Link>
         </div>
       </div>
     );
@@ -95,20 +125,33 @@ export const TeamDetails = () => {
             const spent = calculateSpentBudget(team);
             const budgetTotal = Number(team.budget_total) || 0;
             const budgetRemaining = Number(team.budget_remaining) || 0;
-            const spentPercent = budgetTotal > 0 ? Math.min(100, (spent / budgetTotal) * 100) : 0;
+            const spentPercent =
+              budgetTotal > 0 ? Math.min(100, (spent / budgetTotal) * 100) : 0;
 
             return (
               <div key={team.id} className="card card-hover">
                 {/* Team Header */}
                 <div className="border-b border-border pb-4 sm:pb-6 mb-4 sm:mb-6">
-                  <div className="flex justify-between items-start gap-2 mb-4">
-                    <div className="min-w-0">
-                      <h2 className="text-xl sm:text-3xl font-bold text-primary mb-1 sm:mb-2 truncate">
-                        #{idx + 1} {team.team_name}
-                      </h2>
-                      <p className="text-sm sm:text-lg text-textLight">
-                        Owner: {team.owner_name}
-                      </p>
+                  <div className="flex justify-between items-start gap-4 mb-4">
+                    <div className="flex items-start gap-4 min-w-0">
+                      {team.team_logo && (
+                        <img
+                          src={getImagePath("team-logo", team.team_logo)}
+                          alt={team.team_name}
+                          className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded border border-border flex-shrink-0"
+                          onError={(e) => {
+                            e.target.style.display = "none";
+                          }}
+                        />
+                      )}
+                      <div className="min-w-0">
+                        <h2 className="text-xl sm:text-3xl font-bold text-primary mb-1 sm:mb-2 truncate">
+                          #{idx + 1} {team.team_name}
+                        </h2>
+                        <p className="text-sm sm:text-lg text-textLight">
+                          Owner: {team.owner_name}
+                        </p>
+                      </div>
                     </div>
                     <span className="bg-primary text-white text-xl sm:text-3xl px-3 sm:px-4 py-1 sm:py-2 rounded-lg font-bold flex-shrink-0">
                       {squad.length}
@@ -126,13 +169,17 @@ export const TeamDetails = () => {
                       </p>
                     </div>
                     <div>
-                      <p className="text-textLight text-xs sm:text-sm mb-1">Spent</p>
+                      <p className="text-textLight text-xs sm:text-sm mb-1">
+                        Spent
+                      </p>
                       <p className="text-lg sm:text-2xl font-bold text-secondary">
                         ₹{spent.toLocaleString()}
                       </p>
                     </div>
                     <div>
-                      <p className="text-textLight text-xs sm:text-sm mb-1">Remaining</p>
+                      <p className="text-textLight text-xs sm:text-sm mb-1">
+                        Remaining
+                      </p>
                       <p
                         className={`text-lg sm:text-2xl font-bold ${budgetRemaining > 0 ? "text-success" : "text-danger"}`}
                       >
@@ -200,9 +247,15 @@ export const TeamDetails = () => {
                                 <div className="flex items-center gap-3">
                                   {player.photo_url && (
                                     <img
-                                      src={player.photo_url}
+                                      src={getImagePath(
+                                        "player-photo",
+                                        player.photo_url,
+                                      )}
                                       alt={player.player_name}
                                       className="w-8 h-8 rounded-full object-cover"
+                                      onError={(e) => {
+                                        e.target.style.display = "none";
+                                      }}
                                     />
                                   )}
                                   <span className="font-bold text-text">

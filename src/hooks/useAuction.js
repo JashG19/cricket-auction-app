@@ -176,7 +176,8 @@ export const useAuction = () => {
         const team = teamSnapshot.val();
 
         const updatedSquad = [...(team.squad || []), playerId];
-        const newBudgetRemaining = Number(team.budget_remaining || 0) - Number(soldPrice);
+        const newBudgetRemaining =
+          Number(team.budget_remaining || 0) - Number(soldPrice);
 
         await update(teamRef, {
           squad: updatedSquad,
@@ -244,6 +245,36 @@ export const useAuction = () => {
     }
   }, []);
 
+  const updateTeam = useCallback(async (auctionId, teamId, teamData) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const teamRef = ref(db, `auctions/${auctionId}/teams/${teamId}`);
+      await update(teamRef, teamData);
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const deleteTeam = useCallback(async (auctionId, teamId) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const teamRef = ref(db, `auctions/${auctionId}/teams/${teamId}`);
+      await remove(teamRef);
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   return {
     auctions,
     loading,
@@ -260,5 +291,7 @@ export const useAuction = () => {
     deleteAuction,
     updateGroup,
     deleteGroup,
+    updateTeam,
+    deleteTeam,
   };
 };

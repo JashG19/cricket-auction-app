@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useRealtimeData } from "../hooks/useRealtimeData";
 import { firebaseObjectToArray } from "../utils/dataTransformUtils";
 import { ROUTES } from "../constants/routes";
+import { Header } from "../components/Header";
 
 export const Home = () => {
   const navigate = useNavigate();
@@ -11,9 +12,10 @@ export const Home = () => {
   const { data: auctionsData } = useRealtimeData("auctions");
 
   const auctionsList = useMemo(
-    () => firebaseObjectToArray(auctionsData).sort(
-      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-    ),
+    () =>
+      firebaseObjectToArray(auctionsData).sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+      ),
     [auctionsData],
   );
 
@@ -27,22 +29,8 @@ export const Home = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary to-darkBg">
-      {/* Navigation */}
-      <nav className="bg-darkBg bg-opacity-80 backdrop-blur-sm p-3 sm:p-4">
-        <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <h1 className="text-xl sm:text-3xl font-bold text-secondary">Cricket Auction</h1>
-          {user && (
-            <div className="flex items-center gap-4">
-              <span className="text-white">{user.email}</span>
-              {isAdmin && (
-                <span className="bg-secondary text-primary px-3 py-1 rounded text-sm font-bold">
-                  Admin
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-      </nav>
+      {/* Header */}
+      <Header showBranding={true} />
 
       {/* Hero */}
       <div className="max-w-6xl mx-auto px-4 py-10 sm:py-20 text-center page-enter">
@@ -83,8 +71,11 @@ export const Home = () => {
                         {auction.name}
                       </h4>
                       <p className="text-gray-300 text-sm">
-                        {auction.date ? new Date(auction.date).toLocaleDateString() : "No date set"}
-                        {" | "}Purse: ₹{(auction.purse_size || 0).toLocaleString()}
+                        {auction.date
+                          ? new Date(auction.date).toLocaleDateString()
+                          : "No date set"}
+                        {" | "}Purse: ₹
+                        {(auction.purse_size || 0).toLocaleString()}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -98,7 +89,9 @@ export const Home = () => {
                           COMPLETED
                         </span>
                       )}
-                      <span className="text-secondary font-bold text-lg">→</span>
+                      <span className="text-secondary font-bold text-lg">
+                        →
+                      </span>
                     </div>
                   </div>
                 </div>

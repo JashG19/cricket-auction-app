@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" fill="none">
+  <!-- White background -->
+  <rect width="200" height="240" fill="white"/>
+
+  <!-- Shield border (rounded pentagon shape) -->
+  <path d="M 30 20 L 170 20 L 170 100 Q 170 160 100 210 Q 30 160 30 100 Z"
+        stroke="black" stroke-width="3" fill="none" stroke-linejoin="round"/>
+
+  <!-- PCL Text - Large Bold Outlined Letters -->
+  <g font-family="Arial, sans-serif" font-weight="900" font-size="90" text-anchor="middle" letter-spacing="-5">
+    <text x="100" y="110" fill="black" stroke="black" stroke-width="1">PCL</text>
+    <!-- Inner outline effect for letters -->
+    <text x="100" y="110" fill="white" stroke="none" font-size="70" opacity="0.7" letter-spacing="2">PCL</text>
+  </g>
+
+  <!-- ESTD 2008 text with bullets -->
+  <text x="100" y="155" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="black">
+    • ESTD 2008 •
+  </text>
+
+  <!-- Star at bottom -->
+  <g transform="translate(100, 190)">
+    <polygon points="0,-12 3.5,-4 12,-2 6,5 8,14 0,9 -8,14 -6,5 -12,-2 -3.5,-4"
+             fill="black"/>
+  </g>
+</svg>
