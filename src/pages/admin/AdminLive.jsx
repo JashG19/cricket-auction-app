@@ -25,6 +25,11 @@ import {
   AUCTION_MODES,
   GROUP_ORDER,
 } from "../../utils/auctionUtils";
+import {
+  generateTeamInsights,
+  getRiskColorClass,
+  formatCurrency,
+} from "../../utils/strategyInsights";
 import { ROUTES } from "../../constants/routes";
 import {
   IoPause,
@@ -38,6 +43,7 @@ import {
   IoVolumeHigh,
   IoVolumeMute,
   IoTv,
+  IoFlash,
 } from "react-icons/io5";
 import { ref, update } from "firebase/database";
 import { db } from "../../utils/firebaseConfig";
@@ -75,6 +81,9 @@ export const AdminLive = () => {
   const [showWinnerModal, setShowWinnerModal] = useState(false);
   const [showUnsoldPanel, setShowUnsoldPanel] = useState(false);
   const [initialAdvanceDone, setInitialAdvanceDone] = useState(false);
+  const [showStrategyInsights, setShowStrategyInsights] = useState(false);
+  const [selectedTeamInsight, setSelectedTeamInsight] = useState(null);
+  const [forceReauction, setForceReauction] = useState(false); // Force show bidding controls for re-auction
 
   // Bidding state
   const {
@@ -92,7 +101,8 @@ export const AdminLive = () => {
   const groupsList = firebaseObjectToArray(groupsData);
 
   // Get auction mode (default to "open_after_aplus" for backward compatibility)
-  const auctionMode = auctionData?.auction_mode || AUCTION_MODES.OPEN_AFTER_APLUS;
+  const auctionMode =
+    auctionData?.auction_mode || AUCTION_MODES.OPEN_AFTER_APLUS;
   const isSequentialMode = auctionMode === AUCTION_MODES.SEQUENTIAL;
 
   // Sort players by group order (groups are in Firebase creation order)
@@ -174,8 +184,41 @@ export const AdminLive = () => {
     auctionMode,
   ]);
 
+  // Strategy insights for all teams (computed only when panel is open)
+  const teamInsights = useMemo(() => {
+    if (!showStrategyInsights) return [];
+    return teamsList.map((team) =>
+      generateTeamInsights(
+        team,
+        sortedPlayers,
+        groupsList,
+        currentPlayer,
+        currentGroup,
+        Number(currentBid) || 0,
+        teamsList
+      )
+    );
+  }, [showStrategyInsights, teamsList, sortedPlayers, groupsList, currentPlayer, currentGroup, currentBid]);
+
+  // Single team insight (for modal view)
+  const selectedInsight = useMemo(() => {
+    if (!selectedTeamInsight) return null;
+    const team = teamsList.find((t) => String(t.id) === String(selectedTeamInsight));
+    if (!team) return null;
+    return generateTeamInsights(
+      team,
+      sortedPlayers,
+      groupsList,
+      currentPlayer,
+      currentGroup,
+      Number(currentBid) || 0,
+      teamsList
+    );
+  }, [selectedTeamInsight, teamsList, sortedPlayers, groupsList, currentPlayer, currentGroup, currentBid]);
+
   // Derived auction progress
-  const isPlayerProcessed = !!(currentPlayer?.soldTo || currentPlayer?.unsold);
+  // forceReauction overrides the unsold check to allow re-auctioning
+  const isPlayerProcessed = !!(currentPlayer?.soldTo || (currentPlayer?.unsold && !forceReauction));
   const soldCount = sortedPlayers.filter((p) => p.soldTo).length;
   const unsoldCount = sortedPlayers.filter((p) => p.unsold).length;
   const remainingCount = sortedPlayers.length - soldCount - unsoldCount;
@@ -205,73 +248,81 @@ export const AdminLive = () => {
   ).length;
 
   // Get next player based on current phase and auction mode
+  // PURE FUNCTION - does not modify state, just returns the next player
   const getNextPlayer = () => {
     // SEQUENTIAL MODE: Groups one after another
     if (isSequentialMode) {
-      const nextPlayer = getNextSequentialPlayer(sortedPlayers, groupsList);
-      // If player was previously unsold, clear that flag for re-auction
-      if (nextPlayer && nextPlayer.unsold) {
-        const playerRef = ref(
-          db,
-          `auctions/${auctionId}/players/${nextPlayer.id}`,
-        );
-        update(playerRef, { unsold: null }).catch((err) =>
-          console.error("Error clearing unsold flag:", err),
-        );
-      }
+      // Skip current player to get the NEXT one
+      const nextPlayer = getNextSequentialPlayer(sortedPlayers, groupsList, currentPlayer?.id);
       return nextPlayer;
     }
 
     // OPEN AFTER A+ MODE: A+ first, then random
     if (auctionPhase === 1) {
       // Phase 1: A+ round
-      // First try to find next unprocessed A+ player
       const nextAplus = getNextAplusPlayer(
         sortedPlayers,
         groupsList,
         unsoldAplusIds,
       );
       if (nextAplus) {
-        // If this player was in the unsold queue (being re-auctioned), clear their unsold flag
-        if (nextAplus.unsold) {
-          const playerRef = ref(
-            db,
-            `auctions/${auctionId}/players/${nextAplus.id}`,
-          );
-          update(playerRef, { unsold: null }).catch((err) =>
-            console.error("Error clearing unsold flag:", err),
-          );
-          // Remove from queue
-          setUnsoldAplusIds((prev) =>
-            prev.filter((id) => String(id) !== String(nextAplus.id)),
-          );
-        }
         return nextAplus;
       }
 
-      // If no A+ left and all A+ are sold, transition to Phase 2
+      // If no A+ left and all A+ are sold, we should transition to Phase 2
+      // But don't modify state here - just return what Phase 2 would return
       if (phase1Complete) {
-        setAuctionPhase(2);
-        setUnsoldAplusIds([]);
         return getRandomPlayer(sortedPlayers, groupsList);
       }
 
       return null;
     } else {
       // Phase 2: Random selection from remaining groups
-      const nextPlayer = getRandomPlayer(sortedPlayers, groupsList);
-      // If player was previously unsold, clear that flag for re-auction
-      if (nextPlayer && nextPlayer.unsold) {
-        const playerRef = ref(
-          db,
-          `auctions/${auctionId}/players/${nextPlayer.id}`,
+      return getRandomPlayer(sortedPlayers, groupsList);
+    }
+  };
+
+  // Handle phase transitions and side effects when actually advancing to next player
+  const advanceToNextPlayer = () => {
+    const nextPlayer = getNextPlayer();
+    if (!nextPlayer) return;
+
+    // Handle Open Auction mode side effects
+    if (!isSequentialMode) {
+      // Phase 1 to Phase 2 transition
+      if (auctionPhase === 1 && phase1Complete) {
+        setAuctionPhase(2);
+        setUnsoldAplusIds([]);
+      }
+      
+      // Clear unsold flag for re-auctioned A+ players
+      if (auctionPhase === 1 && nextPlayer.unsold && unsoldAplusIds.includes(nextPlayer.id)) {
+        const playerRef = ref(db, `auctions/${auctionId}/players/${nextPlayer.id}`);
+        update(playerRef, { unsold: null }).catch((err) =>
+          console.error("Error clearing unsold flag:", err),
         );
+        setUnsoldAplusIds((prev) =>
+          prev.filter((id) => String(id) !== String(nextPlayer.id)),
+        );
+      }
+      
+      // Clear unsold flag for Phase 2 re-auctioned players
+      if (auctionPhase === 2 && nextPlayer.unsold) {
+        const playerRef = ref(db, `auctions/${auctionId}/players/${nextPlayer.id}`);
         update(playerRef, { unsold: null }).catch((err) =>
           console.error("Error clearing unsold flag:", err),
         );
       }
-      return nextPlayer;
     }
+
+    // Set force reauction flag for unsold players
+    if (nextPlayer.unsold) {
+      setForceReauction(true);
+    } else {
+      setForceReauction(false);
+    }
+
+    setCurrentPlayerId(nextPlayer.id);
   };
 
   // Find the next unprocessed player after a given index (legacy, kept for compatibility)
@@ -286,12 +337,12 @@ export const AdminLive = () => {
   useEffect(() => {
     if (!auctionId || sortedPlayers.length === 0) return;
     const liveStateRef = ref(db, `auctions/${auctionId}/live_state`);
-    
+
     // Get sequential progress if in sequential mode
-    const seqProgress = isSequentialMode 
-      ? getSequentialProgress(sortedPlayers, groupsList) 
+    const seqProgress = isSequentialMode
+      ? getSequentialProgress(sortedPlayers, groupsList)
       : null;
-    
+
     update(liveStateRef, {
       currentPlayerId: currentPlayer?.id || null,
       currentBid: currentBid,
@@ -303,6 +354,7 @@ export const AdminLive = () => {
       currentSequentialGroup: seqProgress?.currentGroup || null,
       updatedAt: new Date().toISOString(),
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     auctionId,
     currentPlayer?.id,
@@ -314,22 +366,18 @@ export const AdminLive = () => {
     unsoldAplusIds.length,
     sortedPlayers.length,
     isSequentialMode,
-    groupsList,
+    groupsList.length, // Use length instead of array reference
   ]);
 
-  // Initialize bid when switching to a new unsold player
+  // Initialize bid when switching to a new player (only when player ID changes)
   useEffect(() => {
-    if (currentPlayer && currentGroup && !isPlayerProcessed) {
+    if (currentPlayer && currentGroup) {
+      // Only reset bid when switching to a genuinely new player
       resetBid(currentGroup.base_price || 0);
     }
-  }, [
-    currentPlayerId,
-    currentPlayerIndex,
-    currentPlayer?.id,
-    currentGroup?.base_price,
-    isPlayerProcessed,
-    resetBid,
-  ]);
+    // Only depend on player ID and group base price, not isPlayerProcessed
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPlayerId, currentGroup?.base_price]);
 
   // On initial load, advance to the first player based on phase and mode
   useEffect(() => {
@@ -372,7 +420,12 @@ export const AdminLive = () => {
         }
       }
     }
-  }, [sortedPlayers.length, groupsList.length, initialAdvanceDone, isSequentialMode]);
+  }, [
+    sortedPlayers.length,
+    groupsList.length,
+    initialAdvanceDone,
+    isSequentialMode,
+  ]);
 
   // Play fanfare when auction completes
   useEffect(() => {
@@ -424,6 +477,7 @@ export const AdminLive = () => {
       await update(playerRef, { unsold: true });
       showToast(`${currentPlayer.player_name} marked as unsold`, "info");
       play("unsold");
+      setForceReauction(false); // Reset force flag
 
       // Phase 1: Add A+ players to re-auction queue
       const isAplusPlayer =
@@ -437,10 +491,7 @@ export const AdminLive = () => {
       }
 
       // Advance to next player using phase logic
-      const nextPlayer = getNextPlayer();
-      if (nextPlayer) {
-        setCurrentPlayerId(nextPlayer.id);
-      }
+      advanceToNextPlayer();
     } catch (error) {
       showToast("Error: " + error.message, "error");
     }
@@ -484,6 +535,7 @@ export const AdminLive = () => {
       await update(playerRef, {
         soldTo: teamId,
         soldPrice: currentBid,
+        unsold: null, // Clear unsold flag when sold
       });
 
       const teamRef = ref(db, `auctions/${auctionId}/teams/${teamId}`);
@@ -512,6 +564,7 @@ export const AdminLive = () => {
         colors: ["#ffc107", "#1a3a52", "#10b981"],
       });
       setShowWinnerModal(false);
+      setForceReauction(false); // Reset force flag
 
       // Remove from unsold queue if it was an A+ re-auction
       if (unsoldAplusIds.includes(currentPlayer.id)) {
@@ -521,10 +574,7 @@ export const AdminLive = () => {
       }
 
       // Advance to next player using phase logic
-      const nextPlayer = getNextPlayer();
-      if (nextPlayer) {
-        setCurrentPlayerId(nextPlayer.id);
-      }
+      advanceToNextPlayer();
     } catch (error) {
       showToast("Error updating auction: " + error.message, "error");
     }
@@ -777,10 +827,10 @@ export const AdminLive = () => {
                         : "bg-green-500 text-white"
                   }`}
                 >
-                  {isSequentialMode 
+                  {isSequentialMode
                     ? `SEQUENTIAL: ${normalizeGroupName(currentGroup?.group_name) || "—"}`
-                    : auctionPhase === 1 
-                      ? "PHASE 1: A+ ROUND" 
+                    : auctionPhase === 1
+                      ? "PHASE 1: A+ ROUND"
                       : "PHASE 2: RANDOM"}
                 </span>
               </div>
@@ -796,7 +846,9 @@ export const AdminLive = () => {
                 )}
                 {isSequentialMode && currentGroup && (
                   <span className="ml-2 text-blue-300">
-                    | {normalizeGroupName(currentGroup.group_name)}: {currentGroupPlayers.filter(p => p.soldTo).length}/{currentGroupPlayers.length} sold
+                    | {normalizeGroupName(currentGroup.group_name)}:{" "}
+                    {currentGroupPlayers.filter((p) => p.soldTo).length}/
+                    {currentGroupPlayers.length} sold
                   </span>
                 )}
               </p>
@@ -827,6 +879,13 @@ export const AdminLive = () => {
                 className="btn btn-sm sm:btn-sm btn-secondary flex items-center gap-1"
               >
                 <IoPeople size={16} /> Players
+              </button>
+              <button
+                onClick={() => setShowStrategyInsights(!showStrategyInsights)}
+                className={`btn btn-sm flex items-center gap-1 ${showStrategyInsights ? "bg-purple-600 text-white" : "btn-secondary"}`}
+                title="Toggle Strategy Insights"
+              >
+                <IoFlash size={16} /> Strategy
               </button>
               <button
                 onClick={() => setAuctionPaused(!auctionPaused)}
@@ -860,9 +919,8 @@ export const AdminLive = () => {
                 const gPlayers = sortedPlayers.filter(
                   (p) => String(p.group_id) === String(group.id),
                 );
-                const gDone = gPlayers.filter(
-                  (p) => p.soldTo || p.unsold,
-                ).length;
+                // Only count SOLD players for progress (not unsold)
+                const gDone = gPlayers.filter((p) => p.soldTo).length;
                 const isActive =
                   currentGroup && String(group.id) === String(currentGroup.id);
                 const isComplete =
@@ -1047,13 +1105,20 @@ export const AdminLive = () => {
                     )}
                     <button
                       onClick={() => {
-                        const nextIdx = findNextUnsold();
-                        if (nextIdx !== -1) setCurrentPlayerIndex(nextIdx);
+                        advanceToNextPlayer();
+                        // Reset bid for new player
+                        const nextPlayer = getNextPlayer();
+                        if (nextPlayer) {
+                          const playerGroup = groupsList.find(g => String(g.id) === String(nextPlayer.group_id));
+                          if (playerGroup) {
+                            resetBid(playerGroup.base_price || 0);
+                          }
+                        }
                       }}
-                      disabled={findNextUnsold() === -1}
+                      disabled={!getNextPlayer()}
                       className="w-full btn btn-primary disabled:opacity-50"
                     >
-                      Next Unsold Player
+                      Next Player
                     </button>
                   </div>
                 ) : (
@@ -1131,11 +1196,16 @@ export const AdminLive = () => {
                       info && !info.canAfford && !isPlayerProcessed;
                     const isIneligible =
                       info && !info.eligible && !isPlayerProcessed;
+                    
+                    // Get insight for this team if strategy panel is open
+                    const insight = showStrategyInsights
+                      ? teamInsights.find((i) => i.teamId === team.id)
+                      : null;
 
                     return (
                       <div
                         key={team.id}
-                        className={`flex items-center gap-2 py-2 px-3 rounded-md border-l-4 transition group relative ${
+                        className={`py-2 px-3 rounded-md border-l-4 transition group relative ${
                           budgetExceeded
                             ? "border-l-red-500 bg-red-50"
                             : isIneligible
@@ -1143,27 +1213,63 @@ export const AdminLive = () => {
                               : "border-l-green-500 hover:bg-gray-50"
                         }`}
                       >
-                        <span className="font-bold text-sm text-text truncate flex-1 min-w-0">
-                          {team.team_name}
-                        </span>
-                        <span
-                          className={`text-xs font-semibold whitespace-nowrap ${budgetExceeded ? "text-red-600" : "text-textLight"}`}
-                        >
-                          ₹{(team.budget_remaining || 0).toLocaleString()}
-                        </span>
-                        <span className="bg-primary/10 text-primary text-xs font-bold px-1.5 py-0.5 rounded whitespace-nowrap">
-                          {team.squad?.length || 0}/
-                          {auctionData?.max_players_per_team || "∞"}
-                        </span>
-                        {isIneligible && (
-                          <IoAlertCircle
-                            className="text-red-500 flex-shrink-0"
-                            size={18}
-                            title={info.reasons.join(" | ")}
-                          />
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-text truncate flex-1 min-w-0">
+                            {team.team_name}
+                          </span>
+                          <span
+                            className={`text-xs font-semibold whitespace-nowrap ${budgetExceeded ? "text-red-600" : "text-textLight"}`}
+                          >
+                            ₹{(team.budget_remaining || 0).toLocaleString()}
+                          </span>
+                          <span className="bg-primary/10 text-primary text-xs font-bold px-1.5 py-0.5 rounded whitespace-nowrap">
+                            {team.squad?.length || 0}/
+                            {auctionData?.max_players_per_team || "∞"}
+                          </span>
+                          {isIneligible && (
+                            <IoAlertCircle
+                              className="text-red-500 flex-shrink-0"
+                              size={18}
+                              title={info.reasons.join(" | ")}
+                            />
+                          )}
+                          {showStrategyInsights && (
+                            <button
+                              onClick={() => setSelectedTeamInsight(team.id)}
+                              className="text-purple-600 hover:text-purple-800"
+                              title="View full insights"
+                            >
+                              <IoFlash size={16} />
+                            </button>
+                          )}
+                        </div>
+                        
+                        {/* Strategy insight mini-view */}
+                        {showStrategyInsights && insight && (
+                          <div className="mt-2 pt-2 border-t border-gray-200 text-xs">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${getRiskColorClass(insight.budgetAnalysis.riskLevel)}`}>
+                                {insight.budgetAnalysis.riskLevel.icon} {insight.budgetAnalysis.riskLevel.level}
+                              </span>
+                              <span className="text-gray-500">
+                                Buffer: ₹{insight.budgetAnalysis.flexibleBudget.toLocaleString()}
+                              </span>
+                            </div>
+                            {insight.bidRecommendation && insight.bidRecommendation.canBid && (
+                              <div className="text-gray-600">
+                                💡 Max safe: <span className="font-semibold text-green-700">₹{insight.bidRecommendation.maxSafeBid.toLocaleString()}</span>
+                              </div>
+                            )}
+                            {insight.warnings.length > 0 && (
+                              <div className="text-red-600 mt-1">
+                                {insight.warnings[0].icon} {insight.warnings[0].title}
+                              </div>
+                            )}
+                          </div>
                         )}
+                        
                         {/* Tooltip on hover */}
-                        {isIneligible && info.reasons.length > 0 && (
+                        {isIneligible && info.reasons.length > 0 && !showStrategyInsights && (
                           <div className="absolute bottom-full left-0 mb-1 hidden group-hover:block z-20 bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap shadow-lg">
                             {info.reasons.join(" | ")}
                           </div>
@@ -1290,6 +1396,122 @@ export const AdminLive = () => {
               );
             })}
           </div>
+        </Modal>
+
+        {/* Strategy Insights Detail Modal */}
+        <Modal
+          isOpen={selectedTeamInsight !== null}
+          title={`Strategy Insights - ${selectedInsight?.teamName || "Team"}`}
+          onClose={() => setSelectedTeamInsight(null)}
+        >
+          {selectedInsight && (
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* Budget Summary */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-bold text-primary mb-2 flex items-center gap-2">
+                  💰 Budget Analysis
+                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getRiskColorClass(selectedInsight.budgetAnalysis.riskLevel)}`}>
+                    {selectedInsight.budgetAnalysis.riskLevel.icon} {selectedInsight.budgetAnalysis.riskLevel.level}
+                  </span>
+                </h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-500">Remaining:</span>
+                    <span className="font-semibold ml-1">₹{selectedInsight.budgetAnalysis.budget.toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Slots Left:</span>
+                    <span className="font-semibold ml-1">{selectedInsight.budgetAnalysis.slotsRemaining}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Must Reserve:</span>
+                    <span className="font-semibold ml-1 text-orange-600">₹{selectedInsight.budgetAnalysis.mandatoryReserve.toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Flexible:</span>
+                    <span className={`font-semibold ml-1 ${selectedInsight.budgetAnalysis.flexibleBudget < 300 ? "text-red-600" : "text-green-600"}`}>
+                      ₹{selectedInsight.budgetAnalysis.flexibleBudget.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bid Recommendation */}
+              {selectedInsight.bidRecommendation && currentPlayer && (
+                <div className="bg-purple-50 rounded-lg p-4">
+                  <h4 className="font-bold text-purple-700 mb-2">🎯 Bid Recommendation</h4>
+                  <p className="text-sm text-gray-700 mb-2">
+                    <span className="font-semibold">For {currentPlayer.player_name}:</span> {selectedInsight.bidRecommendation.reason}
+                  </p>
+                  {selectedInsight.bidRecommendation.canBid ? (
+                    <div className="grid grid-cols-3 gap-2 text-sm">
+                      <div className="bg-green-100 rounded p-2 text-center">
+                        <div className="text-xs text-green-600">Conservative</div>
+                        <div className="font-bold text-green-700">₹{selectedInsight.bidRecommendation.conservativeBid.toLocaleString()}</div>
+                      </div>
+                      <div className="bg-yellow-100 rounded p-2 text-center">
+                        <div className="text-xs text-yellow-600">Balanced</div>
+                        <div className="font-bold text-yellow-700">₹{selectedInsight.bidRecommendation.balancedBid.toLocaleString()}</div>
+                      </div>
+                      <div className="bg-red-100 rounded p-2 text-center">
+                        <div className="text-xs text-red-600">Max Safe</div>
+                        <div className="font-bold text-red-700">₹{selectedInsight.bidRecommendation.maxSafeBid.toLocaleString()}</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-red-100 text-red-700 rounded p-2 text-sm">
+                      ⚠️ {selectedInsight.bidRecommendation.reason}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Group Requirements */}
+              <div className="bg-blue-50 rounded-lg p-4">
+                <h4 className="font-bold text-blue-700 mb-2">📊 Group Requirements</h4>
+                <div className="space-y-2">
+                  {selectedInsight.groupOpportunities.map((opp) => (
+                    <div key={opp.group} className="flex items-center justify-between text-sm">
+                      <span className="font-semibold">{opp.group}</span>
+                      <div className="flex items-center gap-2">
+                        <span className={opp.fulfilled ? "text-green-600" : "text-orange-600"}>
+                          {opp.current}/{opp.min}
+                        </span>
+                        {opp.fulfilled ? (
+                          <span className="text-green-600 text-xs">✅</span>
+                        ) : (
+                          <span className="text-orange-600 text-xs">Need {opp.needed}</span>
+                        )}
+                        {opp.urgent && !opp.fulfilled && (
+                          <span className="text-red-600 text-xs">⚠️ Only {opp.available} left!</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Warnings */}
+              {selectedInsight.warnings.length > 0 && (
+                <div className="bg-red-50 rounded-lg p-4">
+                  <h4 className="font-bold text-red-700 mb-2">⚠️ Warnings</h4>
+                  <div className="space-y-2">
+                    {selectedInsight.warnings.map((warning, idx) => (
+                      <div key={idx} className="text-sm">
+                        <span className="font-semibold">{warning.icon} {warning.title}</span>
+                        <p className="text-gray-600 text-xs">{warning.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Summary */}
+              <div className="text-center text-sm text-gray-600 border-t pt-3">
+                {selectedInsight.summary}
+              </div>
+            </div>
+          )}
         </Modal>
 
         {/* Toast Notifications */}

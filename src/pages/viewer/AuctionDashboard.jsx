@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useRealtimeData } from "../../hooks/useRealtimeData";
 import {
   firebaseObjectToArray,
@@ -9,13 +9,15 @@ import {
   getImagePath,
 } from "../../utils/dataTransformUtils";
 import { ROUTES } from "../../constants/routes";
-import { IoArrowBack } from "react-icons/io5";
+import { IoArrowBack, IoClose } from "react-icons/io5";
 import { AnimatedNumber } from "../../components/AnimatedNumber";
 import pcLogo from "/images/PCL Logo.png";
 
 export const AuctionDashboard = () => {
   const { auctionId } = useParams();
+  const navigate = useNavigate();
   const [selectedGroup, setSelectedGroup] = useState("all");
+  const [showTeamSelector, setShowTeamSelector] = useState(false);
 
   // Real-time data
   const {
@@ -406,7 +408,7 @@ export const AuctionDashboard = () => {
         </div>
 
         {/* Quick Links */}
-        <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <Link
             to={ROUTES.TEAM_DETAILS(auctionId)}
             className="card card-hover p-4 sm:p-6 hover:shadow-lg transition cursor-pointer bg-gradient-to-br from-primary to-darkBg text-white"
@@ -430,6 +432,18 @@ export const AuctionDashboard = () => {
               Search and filter all players
             </p>
           </Link>
+
+          <button
+            onClick={() => setShowTeamSelector(true)}
+            className="card card-hover p-4 sm:p-6 hover:shadow-lg transition cursor-pointer bg-gradient-to-br from-purple-600 to-purple-900 text-white text-left"
+          >
+            <h3 className="text-xl sm:text-2xl font-bold mb-2">
+              Team Owner Login
+            </h3>
+            <p className="text-gray-200 text-sm">
+              Access your team's private dashboard
+            </p>
+          </button>
         </div>
 
         {/* Player Pool Preview */}
@@ -526,6 +540,68 @@ export const AuctionDashboard = () => {
           )}
         </div>
       </div>
+
+      {/* Team Selector Modal */}
+      {showTeamSelector && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-purple-600 to-purple-800 text-white">
+              <h3 className="text-xl font-bold">Select Your Team</h3>
+              <button
+                onClick={() => setShowTeamSelector(false)}
+                className="p-1 hover:bg-white/20 rounded-full transition"
+              >
+                <IoClose size={24} />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              <p className="text-textLight text-sm mb-4">
+                Choose your team to access the private owner dashboard with detailed budget insights and strategy tools.
+              </p>
+              <div className="space-y-3">
+                {teamsList.length === 0 ? (
+                  <p className="text-center text-textLight py-8">No teams found</p>
+                ) : (
+                  teamsList.map((team) => (
+                    <button
+                      key={team.id}
+                      onClick={() => {
+                        setShowTeamSelector(false);
+                        navigate(ROUTES.TEAM_OWNER(auctionId, team.id));
+                      }}
+                      className="w-full flex items-center gap-4 p-4 border-2 border-border rounded-lg hover:border-purple-500 hover:bg-purple-50 transition text-left"
+                    >
+                      <div className="w-12 h-12 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
+                        {team.team_logo ? (
+                          <img
+                            src={getImagePath("team-logo", team.team_logo)}
+                            alt={team.team_name}
+                            className="w-full h-full object-contain"
+                            onError={(e) => {
+                              e.target.style.display = "none";
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-primary font-bold text-xl">
+                            {team.team_name?.charAt(0) || "T"}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-text truncate">{team.team_name}</p>
+                        <p className="text-sm text-textLight">
+                          Budget: ₹{(team.budget_remaining || 0).toLocaleString()} remaining
+                        </p>
+                      </div>
+                      <span className="text-purple-600 font-semibold text-sm">→</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -8,7 +8,12 @@ import {
   getImagePath,
 } from "../../utils/dataTransformUtils";
 import { ROUTES } from "../../constants/routes";
-import { IoArrowBack, IoLockClosed } from "react-icons/io5";
+import { IoArrowBack, IoLockClosed, IoWarning, IoCheckmarkCircle, IoAlertCircle } from "react-icons/io5";
+import {
+  generateTeamInsights,
+  formatCurrency,
+  getRiskColorClass,
+} from "../../utils/strategyInsights";
 
 export const TeamOwnerView = () => {
   const { auctionId, teamId } = useParams();
@@ -86,6 +91,29 @@ export const TeamOwnerView = () => {
       mostExpensive: sorted[0],
     };
   }, [squad]);
+
+  // Strategy insights for this team
+  const teamInsights = useMemo(() => {
+    if (!teamData || !groupsList.length || !playersList.length) return null;
+    
+    // Build team object with required fields
+    const team = {
+      id: teamId,
+      team_name: teamData.team_name,
+      budget_remaining: Number(teamData.budget_remaining) || 0,
+      squad: teamData.squad || [],
+    };
+    
+    // Pass full playersList (not squad) as 2nd argument
+    return generateTeamInsights(
+      team, 
+      playersList,  // ALL players, not just squad
+      groupsList, 
+      currentLivePlayer,  // currentPlayer
+      currentLiveGroup,   // currentGroup (object with group_name)
+      liveState?.currentBid || 0  // currentBid
+    );
+  }, [teamData, teamId, playersList, groupsList, currentLivePlayer, currentLiveGroup, liveState?.currentBid]);
 
   const spent = teamData ? calculateSpentBudget(teamData) : 0;
   const budgetTotal = Number(teamData?.budget_total) || 0;
@@ -253,6 +281,97 @@ export const TeamOwnerView = () => {
         {liveState?.isComplete && (
           <div className="card mb-6 bg-green-50 border-2 border-success text-center p-4">
             <p className="text-lg font-bold text-success">Auction Complete!</p>
+          </div>
+        )}
+
+        {/* Strategy Insights Section */}
+        {teamInsights && !liveState?.isComplete && (
+          <div className="card mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-primary">Strategy Insights</h2>
+              <span className={`px-3 py-1 rounded-full text-sm font-bold ${getRiskColorClass(teamInsights.budgetAnalysis.riskLevel)}`}>
+                {teamInsights.budgetAnalysis.riskLevel?.level || 'UNKNOWN'} Risk
+              </span>
+            </div>
+
+            {/* Budget Analysis */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-textLight mb-1">Mandatory Reserve</p>
+                <p className="text-lg font-bold text-primary">{formatCurrency(teamInsights.budgetAnalysis.mandatoryReserve)}</p>
+                <p className="text-xs text-textLight">Min needed for requirements</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-textLight mb-1">Flexible Budget</p>
+                <p className={`text-lg font-bold ${teamInsights.budgetAnalysis.flexibleBudget >= 0 ? 'text-success' : 'text-danger'}`}>
+                  {formatCurrency(teamInsights.budgetAnalysis.flexibleBudget)}
+                </p>
+                <p className="text-xs text-textLight">Available for bidding</p>
+              </div>
+            </div>
+
+            {/* Group Requirements */}
+            {teamInsights.groupOpportunities && teamInsights.groupOpportunities.length > 0 && (
+              <div className="mb-4">
+                <p className="text-sm font-semibold text-text mb-2">Group Requirements</p>
+                <div className="flex flex-wrap gap-2">
+                  {teamInsights.groupOpportunities.map((opp) => (
+                    <div 
+                      key={opp.group}
+                      className={`text-xs px-3 py-2 rounded-lg border ${
+                        opp.stillNeed > 0 
+                          ? 'bg-orange-50 border-orange-200 text-orange-800' 
+                          : opp.canBuyMore > 0
+                            ? 'bg-blue-50 border-blue-200 text-blue-800'
+                            : 'bg-green-50 border-green-200 text-green-800'
+                      }`}
+                    >
+                      <span className="font-bold">{opp.group}</span>
+                      {opp.stillNeed > 0 ? (
+                        <span className="ml-1">Need {opp.stillNeed} more</span>
+                      ) : opp.canBuyMore > 0 ? (
+                        <span className="ml-1">Can buy {opp.canBuyMore} more</span>
+                      ) : (
+                        <span className="ml-1 flex items-center gap-1"><IoCheckmarkCircle size={12} /> Complete</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Warnings */}
+            {teamInsights.warnings && teamInsights.warnings.length > 0 && (
+              <div className="space-y-2">
+                {teamInsights.warnings.map((warning, idx) => (
+                  <div 
+                    key={idx}
+                    className={`flex items-start gap-2 p-3 rounded-lg text-sm ${
+                      warning.severity === 'critical' ? 'bg-red-50 text-red-800 border border-red-200' :
+                      warning.severity === 'high' ? 'bg-orange-50 text-orange-800 border border-orange-200' :
+                      'bg-yellow-50 text-yellow-800 border border-yellow-200'
+                    }`}
+                  >
+                    {warning.severity === 'critical' ? (
+                      <IoAlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                    ) : (
+                      <IoWarning size={18} className={`flex-shrink-0 mt-0.5 ${
+                        warning.severity === 'high' ? 'text-orange-600' : 'text-yellow-600'
+                      }`} />
+                    )}
+                    <span>{warning.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* No warnings - show success */}
+            {(!teamInsights.warnings || teamInsights.warnings.length === 0) && teamInsights.budgetAnalysis.riskLevel?.level === 'SAFE' && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 text-green-800 border border-green-200 text-sm">
+                <IoCheckmarkCircle size={18} className="text-green-600" />
+                <span>Budget is healthy. You can bid comfortably on upcoming players.</span>
+              </div>
+            )}
           </div>
         )}
 

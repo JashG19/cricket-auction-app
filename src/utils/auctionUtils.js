@@ -32,17 +32,17 @@ export const TOTAL_MIN_RESERVE = Object.values(GROUP_RULES).reduce(
 export const normalizeGroupName = (groupName) => {
   if (!groupName) return null;
   let normalized = groupName.trim();
-  
+
   // Remove "Group " prefix if present (case-insensitive)
   if (normalized.toLowerCase().startsWith("group ")) {
     normalized = normalized.substring(6).trim();
   }
-  
+
   // Find matching key in GROUP_RULES (case-insensitive)
   const matchingKey = Object.keys(GROUP_RULES).find(
     (k) => k.toLowerCase() === normalized.toLowerCase(),
   );
-  
+
   return matchingKey || normalized;
 };
 
@@ -81,7 +81,9 @@ export const getTeamGroupCounts = (squad, players, groups) => {
           counts[normalizedName]++;
         } else {
           // Log unmatched group for debugging
-          console.warn(`⚠️ Unknown group name: "${groupName}" (normalized: "${normalizedName}")`);
+          console.warn(
+            `⚠️ Unknown group name: "${groupName}" (normalized: "${normalizedName}")`,
+          );
         }
       }
     }
@@ -147,7 +149,7 @@ export const checkTeamEligibility = (
 ) => {
   // Normalize the group name to match GROUP_RULES keys
   const normalizedGroupName = normalizeGroupName(currentGroupName);
-  
+
   const budgetRemaining = Number(team.budget_remaining) || 0;
   const squadSize = team.squad?.length || 0;
   const reasons = [];
@@ -167,7 +169,9 @@ export const checkTeamEligibility = (
   }
 
   // 3. Group max check (only if we have a valid group)
-  const groupRule = normalizedGroupName ? GROUP_RULES[normalizedGroupName] : null;
+  const groupRule = normalizedGroupName
+    ? GROUP_RULES[normalizedGroupName]
+    : null;
   const currentGroupCount = normalizedGroupName
     ? groupCounts[normalizedGroupName] || 0
     : 0;
@@ -180,7 +184,10 @@ export const checkTeamEligibility = (
 
   // 4. Reserve for unfilled minimums check
   const budgetAfterBid = budgetRemaining - bidAmount;
-  const minReserveNeeded = calculateMinReserve(groupCounts, normalizedGroupName);
+  const minReserveNeeded = calculateMinReserve(
+    groupCounts,
+    normalizedGroupName,
+  );
   const canMeetMinimums = budgetAfterBid >= minReserveNeeded;
   if (!canMeetMinimums && canAffordBid && minReserveNeeded > 0) {
     reasons.push(
@@ -377,20 +384,20 @@ export const getCurrentSequentialGroup = (players, groups) => {
       const normalized = normalizeGroupName(g.group_name);
       return normalized === groupName;
     });
-    
+
     if (!group) continue;
-    
+
     // Check if this group has any unsold players
     const groupPlayers = players.filter(
-      (p) => String(p.group_id) === String(group.id)
+      (p) => String(p.group_id) === String(group.id),
     );
     const hasUnsoldPlayers = groupPlayers.some((p) => !p.soldTo);
-    
+
     if (hasUnsoldPlayers) {
       return group;
     }
   }
-  
+
   return null; // All groups complete
 };
 
@@ -398,29 +405,56 @@ export const getCurrentSequentialGroup = (players, groups) => {
  * Get the next player for sequential mode
  * @param {Array} players - All players
  * @param {Array} groups - All groups
+ * @param {string|null} skipPlayerId - Optional player ID to skip (current player)
  * @returns {Object|null} - Next player in sequence, or null if auction complete
  */
-export const getNextSequentialPlayer = (players, groups) => {
+export const getNextSequentialPlayer = (
+  players,
+  groups,
+  skipPlayerId = null,
+) => {
   const currentGroup = getCurrentSequentialGroup(players, groups);
-  
+
   if (!currentGroup) return null; // All groups complete
-  
+
   // Get players from current group
   const groupPlayers = players.filter(
-    (p) => String(p.group_id) === String(currentGroup.id)
+    (p) => String(p.group_id) === String(currentGroup.id),
   );
-  
-  // First, find players not yet auctioned
-  const notYetAuctioned = groupPlayers.find((p) => !p.soldTo && !p.unsold);
+
+  // First, find players not yet auctioned (skip current player if specified)
+  const notYetAuctioned = groupPlayers.find(
+    (p) =>
+      !p.soldTo &&
+      !p.unsold &&
+      (!skipPlayerId || String(p.id) !== String(skipPlayerId)),
+  );
   if (notYetAuctioned) return notYetAuctioned;
-  
+
   // Then, find unsold players for re-auction
-  const unsoldForReauction = groupPlayers.find((p) => !p.soldTo && p.unsold);
-  if (unsoldForReauction) return unsoldForReauction;
+  // Get ALL players not sold (includes those with unsold=true)
+  const allNotSold = groupPlayers.filter((p) => !p.soldTo);
   
-  // Current group complete, move to next (recursive)
-  // This handles edge case where group completion check and player selection are out of sync
-  return getNextSequentialPlayer(players, groups);
+  if (allNotSold.length === 0) {
+    // Current group complete, move to next (recursive)
+    return getNextSequentialPlayer(players, groups, null);
+  }
+
+  // If we have a current player to skip, find the NEXT one in the list
+  if (skipPlayerId) {
+    const currentIndex = allNotSold.findIndex(
+      (p) => String(p.id) === String(skipPlayerId)
+    );
+    
+    if (currentIndex !== -1) {
+      // Return the next player in the list (wrap around to start if at end)
+      const nextIndex = (currentIndex + 1) % allNotSold.length;
+      return allNotSold[nextIndex];
+    }
+  }
+
+  // No skip or current player not in list, return first not-sold player
+  return allNotSold[0];
 };
 
 /**
@@ -432,33 +466,42 @@ export const getNextSequentialPlayer = (players, groups) => {
  * @param {Array} players - All players (to determine current group)
  * @returns {number} - Minimum reserve needed in ₹
  */
-export const calculateSequentialReserve = (groupCounts, currentGroupName, groups, players) => {
+export const calculateSequentialReserve = (
+  groupCounts,
+  currentGroupName,
+  groups,
+  players,
+) => {
   let reserve = 0;
   const normalizedCurrent = normalizeGroupName(currentGroupName);
-  
+
   // Find the current group's position in the order
   const currentGroup = getCurrentSequentialGroup(players, groups);
-  const currentGroupNormalized = currentGroup ? normalizeGroupName(currentGroup.group_name) : null;
-  const currentIndex = currentGroupNormalized ? GROUP_ORDER.indexOf(currentGroupNormalized) : 0;
-  
+  const currentGroupNormalized = currentGroup
+    ? normalizeGroupName(currentGroup.group_name)
+    : null;
+  const currentIndex = currentGroupNormalized
+    ? GROUP_ORDER.indexOf(currentGroupNormalized)
+    : 0;
+
   GROUP_ORDER.forEach((groupName, index) => {
     // Only count current and future groups
     if (index < currentIndex) return;
-    
+
     const rule = GROUP_RULES[groupName];
     if (!rule) return;
-    
+
     let current = groupCounts[groupName] || 0;
-    
+
     // If bidding on this group, assume we'll get one more
     if (groupName === normalizedCurrent) {
       current += 1;
     }
-    
+
     const stillNeeded = Math.max(0, rule.minPerTeam - current);
     reserve += stillNeeded * rule.basePrice;
   });
-  
+
   return reserve;
 };
 
@@ -485,7 +528,7 @@ export const checkTeamEligibilityWithMode = (
   maxSquadSize = TOTAL_PLAYERS_PER_TEAM,
 ) => {
   const normalizedGroupName = normalizeGroupName(currentGroupName);
-  
+
   const budgetRemaining = Number(team.budget_remaining) || 0;
   const squadSize = team.squad?.length || 0;
   const reasons = [];
@@ -505,7 +548,9 @@ export const checkTeamEligibilityWithMode = (
   }
 
   // 3. Group max check
-  const groupRule = normalizedGroupName ? GROUP_RULES[normalizedGroupName] : null;
+  const groupRule = normalizedGroupName
+    ? GROUP_RULES[normalizedGroupName]
+    : null;
   const currentGroupCount = normalizedGroupName
     ? groupCounts[normalizedGroupName] || 0
     : 0;
@@ -519,13 +564,18 @@ export const checkTeamEligibilityWithMode = (
   // 4. Reserve calculation - mode specific
   const budgetAfterBid = budgetRemaining - bidAmount;
   let minReserveNeeded;
-  
+
   if (auctionMode === AUCTION_MODES.SEQUENTIAL) {
-    minReserveNeeded = calculateSequentialReserve(groupCounts, normalizedGroupName, groups, players);
+    minReserveNeeded = calculateSequentialReserve(
+      groupCounts,
+      normalizedGroupName,
+      groups,
+      players,
+    );
   } else {
     minReserveNeeded = calculateMinReserve(groupCounts, normalizedGroupName);
   }
-  
+
   const canMeetMinimums = budgetAfterBid >= minReserveNeeded;
   if (!canMeetMinimums && canAffordBid && minReserveNeeded > 0) {
     reasons.push(
@@ -557,33 +607,37 @@ export const getSequentialProgress = (players, groups) => {
   const progress = {};
   let totalSold = 0;
   let totalPlayers = 0;
-  
+
   GROUP_ORDER.forEach((groupName) => {
-    const group = groups.find((g) => normalizeGroupName(g.group_name) === groupName);
+    const group = groups.find(
+      (g) => normalizeGroupName(g.group_name) === groupName,
+    );
     if (!group) {
       progress[groupName] = { sold: 0, total: 0 };
       return;
     }
-    
+
     const groupPlayers = players.filter(
-      (p) => String(p.group_id) === String(group.id)
+      (p) => String(p.group_id) === String(group.id),
     );
     const sold = groupPlayers.filter((p) => p.soldTo).length;
-    
+
     progress[groupName] = {
       sold,
       total: groupPlayers.length,
       complete: sold === groupPlayers.length && groupPlayers.length > 0,
     };
-    
+
     totalSold += sold;
     totalPlayers += groupPlayers.length;
   });
-  
+
   const currentGroup = getCurrentSequentialGroup(players, groups);
-  
+
   return {
-    currentGroup: currentGroup ? normalizeGroupName(currentGroup.group_name) : null,
+    currentGroup: currentGroup
+      ? normalizeGroupName(currentGroup.group_name)
+      : null,
     groupProgress: progress,
     totalSold,
     totalPlayers,
