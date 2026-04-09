@@ -762,7 +762,9 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
                               </span>
                             </div>
                           </td>
-                          <td className="py-4 px-4 text-text dark:text-gray-300">{player.age}</td>
+                          <td className="py-4 px-4 text-text dark:text-gray-300">
+                            {player.age}
+                          </td>
                           <td className="py-4 px-4">
                             <span className="bg-secondary text-primary px-3 py-1 rounded-full text-sm font-bold">
                               {group?.group_name || "N/A"}

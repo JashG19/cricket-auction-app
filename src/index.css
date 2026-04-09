@@ -18,7 +18,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: #f8f9fa;
   color: #1a1a1a;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
 
 /* Dark mode body styles */
@@ -194,7 +196,7 @@ html.dark body {
   .dark .table-improved tbody tr {
     @apply hover:bg-gray-600;
   }
-  
+
   /* Theme toggle button animation */
   .theme-toggle {
     @apply relative p-2 rounded-full transition-all duration-300;
@@ -208,7 +210,7 @@ html.dark body {
   .theme-toggle:hover svg {
     @apply rotate-12;
   }
-  
+
   /* Dark mode for form inputs */
   input[type="text"],
   input[type="number"],
@@ -235,7 +237,7 @@ html.dark body {
   .dark select option {
     @apply bg-gray-700 text-white;
   }
-  
+
   /* Dark mode for radio buttons and checkboxes labels */
   .dark label {
     @apply text-gray-300;

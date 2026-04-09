@@ -350,7 +350,9 @@ export const TeamOwnerView = () => {
           <div className="card mb-6 border-2 border-secondary">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-3 h-3 bg-success rounded-full animate-pulse"></div>
-              <h2 className="text-lg font-bold text-primary dark:text-secondary">Live Auction</h2>
+              <h2 className="text-lg font-bold text-primary dark:text-secondary">
+                Live Auction
+              </h2>
               {liveState.isPaused && (
                 <span className="text-xs bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400 px-2 py-1 rounded-full font-bold">
                   PAUSED
@@ -449,9 +451,7 @@ export const TeamOwnerView = () => {
                 type="button"
                 onClick={() => setWishlistFilter(filterKey)}
                 className={`btn btn-sm ${
-                  wishlistFilter === filterKey
-                    ? "btn-primary"
-                    : "btn-secondary"
+                  wishlistFilter === filterKey ? "btn-primary" : "btn-secondary"
                 }`}
               >
                 {filterKey.charAt(0).toUpperCase() + filterKey.slice(1)}
@@ -480,7 +480,8 @@ export const TeamOwnerView = () => {
                           {player.player_name}
                         </p>
                         <p className="text-xs text-textLight dark:text-gray-400">
-                          {group?.group_name || "N/A"} | Age: {player.age || "N/A"}
+                          {group?.group_name || "N/A"} | Age:{" "}
+                          {player.age || "N/A"}
                         </p>
                         <p className="text-xs mt-1">
                           <span
@@ -649,11 +650,11 @@ export const TeamOwnerView = () => {
 
         {/* Squad Table */}
         <div className="card mb-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-primary mb-4">
-              Your Squad ({squad.length}
-              {auctionData?.max_players_per_team
-                ? `/${auctionData.max_players_per_team}`
-                : ""}
+          <h2 className="text-xl sm:text-2xl font-bold text-primary mb-4">
+            Your Squad ({squad.length}
+            {auctionData?.max_players_per_team
+              ? `/${auctionData.max_players_per_team}`
+              : ""}
             )
           </h2>
 

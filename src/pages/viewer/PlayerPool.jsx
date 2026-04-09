@@ -261,7 +261,8 @@ export const PlayerPool = () => {
               {statusFilter !== "all" && ` (status: ${statusFilter})`}
             </p>
             <p className="text-xs text-textLight mt-1">
-              Pending: {pendingCount} | Sold: {soldCount} | Unsold: {unsoldCount}
+              Pending: {pendingCount} | Sold: {soldCount} | Unsold:{" "}
+              {unsoldCount}
             </p>
           </div>
         </div>

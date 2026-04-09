@@ -106,7 +106,9 @@ export const AuctionDashboard = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-lightBg dark:bg-gray-900 transition-colors">
         <div className="text-center">
-          <p className="text-xl text-textLight dark:text-gray-400 mb-4">Loading auction data...</p>
+          <p className="text-xl text-textLight dark:text-gray-400 mb-4">
+            Loading auction data...
+          </p>
           <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-primary dark:border-secondary mx-auto"></div>
         </div>
       </div>
