@@ -112,7 +112,7 @@ export const AdminResults = () => {
   };
 
   return (
-    <div className="min-h-screen bg-lightBg">
+    <div className="min-h-screen bg-lightBg dark:bg-gray-900 transition-colors duration-300">
       {/* Header */}
       <Header showBranding={true} />
 
@@ -121,10 +121,12 @@ export const AdminResults = () => {
           {/* Page Title */}
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6 sm:mb-8">
             <div className="min-w-0">
-              <h1 className="text-2xl sm:text-4xl font-bold text-primary truncate">
+              <h1 className="text-2xl sm:text-4xl font-bold text-primary dark:text-secondary truncate">
                 {auctionData?.name} - Results
               </h1>
-              <p className="text-textLight text-sm">Auction Summary & Export</p>
+              <p className="text-textLight dark:text-gray-400 text-sm">
+                Auction Summary & Export
+              </p>
             </div>
             <button
               onClick={() => navigate(-1)}
@@ -137,23 +139,23 @@ export const AdminResults = () => {
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
             <div className="card card-hover text-center p-4">
-              <p className="text-textLight text-xs sm:text-base mb-1 sm:mb-2">
+              <p className="text-textLight dark:text-gray-400 text-xs sm:text-base mb-1 sm:mb-2">
                 Total Teams
               </p>
-              <p className="text-2xl sm:text-4xl font-bold text-primary">
+              <p className="text-2xl sm:text-4xl font-bold text-primary dark:text-white">
                 {teamsList.length}
               </p>
             </div>
             <div className="card card-hover text-center p-4">
-              <p className="text-textLight text-xs sm:text-base mb-1 sm:mb-2">
+              <p className="text-textLight dark:text-gray-400 text-xs sm:text-base mb-1 sm:mb-2">
                 Total Players
               </p>
-              <p className="text-2xl sm:text-4xl font-bold text-primary">
+              <p className="text-2xl sm:text-4xl font-bold text-primary dark:text-white">
                 {totalPlayers}
               </p>
             </div>
             <div className="card card-hover text-center p-4">
-              <p className="text-textLight text-xs sm:text-base mb-1 sm:mb-2">
+              <p className="text-textLight dark:text-gray-400 text-xs sm:text-base mb-1 sm:mb-2">
                 Sold Players
               </p>
               <p className="text-2xl sm:text-4xl font-bold text-secondary">
@@ -161,7 +163,7 @@ export const AdminResults = () => {
               </p>
             </div>
             <div className="card card-hover text-center p-4">
-              <p className="text-textLight text-xs sm:text-base mb-1 sm:mb-2">
+              <p className="text-textLight dark:text-gray-400 text-xs sm:text-base mb-1 sm:mb-2">
                 Unsold Players
               </p>
               <p className="text-2xl sm:text-4xl font-bold text-danger">
@@ -185,7 +187,7 @@ export const AdminResults = () => {
 
           {/* Export Buttons */}
           <div className="card mb-6 sm:mb-8 p-4 sm:p-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-primary mb-4 sm:mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-primary dark:text-secondary mb-4 sm:mb-6">
               Export Results
             </h2>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
@@ -212,29 +214,29 @@ export const AdminResults = () => {
 
           {/* Team-wise Summary */}
           <div className="card mb-6 sm:mb-8 p-4 sm:p-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-primary mb-4 sm:mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-primary dark:text-secondary mb-4 sm:mb-6">
               Team-wise Summary
             </h2>
             <div className="overflow-x-auto">
               <table className="w-full table-improved">
                 <thead>
-                  <tr className="border-b-2 border-border">
-                    <th className="text-left py-4 px-4 font-bold text-primary">
+                  <tr className="border-b-2 border-border dark:border-gray-700">
+                    <th className="text-left py-4 px-4 font-bold text-primary dark:text-secondary">
                       Team
                     </th>
-                    <th className="text-left py-4 px-4 font-bold text-primary">
+                    <th className="text-left py-4 px-4 font-bold text-primary dark:text-secondary">
                       Owner
                     </th>
-                    <th className="text-right py-4 px-4 font-bold text-primary">
+                    <th className="text-right py-4 px-4 font-bold text-primary dark:text-secondary">
                       Budget
                     </th>
-                    <th className="text-right py-4 px-4 font-bold text-primary">
+                    <th className="text-right py-4 px-4 font-bold text-primary dark:text-secondary">
                       Spent
                     </th>
-                    <th className="text-right py-4 px-4 font-bold text-primary">
+                    <th className="text-right py-4 px-4 font-bold text-primary dark:text-secondary">
                       Remaining
                     </th>
-                    <th className="text-center py-4 px-4 font-bold text-primary">
+                    <th className="text-center py-4 px-4 font-bold text-primary dark:text-secondary">
                       Players
                     </th>
                   </tr>
@@ -249,27 +251,27 @@ export const AdminResults = () => {
                     return (
                       <tr
                         key={team.id}
-                        className="border-b border-border hover:bg-gray-50 transition"
+                        className="border-b border-border dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
                       >
-                        <td className="py-4 px-4 font-bold text-primary">
+                        <td className="py-4 px-4 font-bold text-primary dark:text-secondary">
                           {team.team_name}
                         </td>
-                        <td className="py-4 px-4 text-text">
+                        <td className="py-4 px-4 text-text dark:text-white">
                           {team.owner_name}
                         </td>
-                        <td className="py-4 px-4 text-right font-semibold">
+                        <td className="py-4 px-4 text-right font-semibold text-text dark:text-white">
                           ₹{(team.budget_total || 0).toLocaleString()}
                         </td>
                         <td className="py-4 px-4">
                           <div className="text-right mb-2">
-                            <p className="font-semibold text-text">
+                            <p className="font-semibold text-text dark:text-white">
                               ₹{spent.toLocaleString()}
                             </p>
-                            <p className="text-xs text-textLight">
+                            <p className="text-xs text-textLight dark:text-gray-400">
                               {spentPercent.toFixed(1)}%
                             </p>
                           </div>
-                          <div className="w-32 bg-gray-200 rounded-full h-2">
+                          <div className="w-32 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
                             <div
                               className="bg-secondary h-2 rounded-full"
                               style={{

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useBidding } from "../../hooks/useBidding";
 import { useRealtimeData } from "../../hooks/useRealtimeData";
+import { useAuctionConfig } from "../../hooks/useAuctionConfig";
 import { useToast } from "../../components/Toast";
 import { ToastContainer } from "../../components/ToastContainer";
 import { Modal } from "../../components/Modal";
@@ -11,19 +12,16 @@ import {
   getImagePath,
 } from "../../utils/dataTransformUtils";
 import {
-  GROUP_RULES,
   getTeamGroupCounts,
-  checkTeamEligibility,
   checkTeamEligibilityWithMode,
   getNextAplusPlayer,
   getRandomPlayer,
   getNextSequentialPlayer,
   isPhase1Complete,
-  getCurrentSequentialGroup,
   getSequentialProgress,
   normalizeGroupName,
+  getFirstGroup,
   AUCTION_MODES,
-  GROUP_ORDER,
 } from "../../utils/auctionUtils";
 import {
   generateTeamInsights,
@@ -100,6 +98,15 @@ export const AdminLive = () => {
   const teamsList = firebaseObjectToArray(teamsData);
   const groupsList = firebaseObjectToArray(groupsData);
 
+  // Load dynamic auction config (groupRules, totals, groupOrder) - uses groupsList as fallback
+  const {
+    groupRules,
+    totalPlayersPerTeam,
+    totalMinReserve,
+    groupOrder,
+    loading: configLoading,
+  } = useAuctionConfig(auctionId, groupsList);
+
   // Get auction mode (default to "open_after_aplus" for backward compatibility)
   const auctionMode =
     auctionData?.auction_mode || AUCTION_MODES.OPEN_AFTER_APLUS;
@@ -135,7 +142,8 @@ export const AdminLive = () => {
 
   // Compute team eligibility for current bid using new auction rules
   const teamEligibility = useMemo(() => {
-    const maxSquadSize = Number(auctionData?.max_players_per_team) || 9;
+    const maxSquadSize =
+      Number(auctionData?.max_players_per_team) || totalPlayersPerTeam || 9;
     const currentGroupName = currentGroup?.group_name || null;
     const bid = Number(currentBid) || 0;
 
@@ -145,6 +153,7 @@ export const AdminLive = () => {
         team.squad,
         sortedPlayers,
         groupsList,
+        groupRules,
       );
 
       // Use mode-aware eligibility checker
@@ -157,9 +166,14 @@ export const AdminLive = () => {
         groupsList,
         sortedPlayers,
         maxSquadSize,
+        groupOrder,
+        groupRules,
       );
 
-      const normalizedGroupName = normalizeGroupName(currentGroupName);
+      const normalizedGroupName = normalizeGroupName(
+        currentGroupName,
+        groupRules,
+      );
 
       return {
         teamId: team.id,
@@ -182,6 +196,8 @@ export const AdminLive = () => {
     groupsList,
     auctionData?.max_players_per_team,
     auctionMode,
+    groupRules,
+    totalPlayersPerTeam,
   ]);
 
   // Strategy insights for all teams (computed only when panel is open)
@@ -195,15 +211,29 @@ export const AdminLive = () => {
         currentPlayer,
         currentGroup,
         Number(currentBid) || 0,
-        teamsList
-      )
+        teamsList,
+        groupRules,
+        totalPlayersPerTeam,
+      ),
     );
-  }, [showStrategyInsights, teamsList, sortedPlayers, groupsList, currentPlayer, currentGroup, currentBid]);
+  }, [
+    showStrategyInsights,
+    teamsList,
+    sortedPlayers,
+    groupsList,
+    currentPlayer,
+    currentGroup,
+    currentBid,
+    groupRules,
+    totalPlayersPerTeam,
+  ]);
 
   // Single team insight (for modal view)
   const selectedInsight = useMemo(() => {
     if (!selectedTeamInsight) return null;
-    const team = teamsList.find((t) => String(t.id) === String(selectedTeamInsight));
+    const team = teamsList.find(
+      (t) => String(t.id) === String(selectedTeamInsight),
+    );
     if (!team) return null;
     return generateTeamInsights(
       team,
@@ -212,30 +242,48 @@ export const AdminLive = () => {
       currentPlayer,
       currentGroup,
       Number(currentBid) || 0,
-      teamsList
+      teamsList,
+      groupRules,
+      totalPlayersPerTeam,
     );
-  }, [selectedTeamInsight, teamsList, sortedPlayers, groupsList, currentPlayer, currentGroup, currentBid]);
+  }, [
+    selectedTeamInsight,
+    teamsList,
+    sortedPlayers,
+    groupsList,
+    currentPlayer,
+    currentGroup,
+    currentBid,
+    groupRules,
+    totalPlayersPerTeam,
+  ]);
 
   // Derived auction progress
   // forceReauction overrides the unsold check to allow re-auctioning
-  const isPlayerProcessed = !!(currentPlayer?.soldTo || (currentPlayer?.unsold && !forceReauction));
+  const isPlayerProcessed = !!(
+    currentPlayer?.soldTo ||
+    (currentPlayer?.unsold && !forceReauction)
+  );
   const soldCount = sortedPlayers.filter((p) => p.soldTo).length;
   const unsoldCount = sortedPlayers.filter((p) => p.unsold).length;
   const remainingCount = sortedPlayers.length - soldCount - unsoldCount;
   const isAuctionComplete = remainingCount === 0 && sortedPlayers.length > 0;
 
-  // Check if Phase 1 (A+ round) is complete
+  // Check if Phase 1 (first group round) is complete
   const phase1Complete = useMemo(() => {
-    return isPhase1Complete(sortedPlayers, groupsList);
-  }, [sortedPlayers, groupsList]);
+    return isPhase1Complete(sortedPlayers, groupsList, groupOrder);
+  }, [sortedPlayers, groupsList, groupOrder]);
 
-  // A+ group info for phase tracking
-  const aplusGroup = groupsList.find((g) => g.group_name === "A+");
-  const aplusPlayers = aplusGroup
-    ? sortedPlayers.filter((p) => String(p.group_id) === String(aplusGroup.id))
+  // First group info for phase tracking (dynamic - not hardcoded to "A+")
+  const firstGroup = useMemo(
+    () => getFirstGroup(groupsList, groupOrder),
+    [groupsList, groupOrder],
+  );
+  const firstGroupPlayers = firstGroup
+    ? sortedPlayers.filter((p) => String(p.group_id) === String(firstGroup.id))
     : [];
-  const aplusSold = aplusPlayers.filter((p) => p.soldTo).length;
-  const aplusTotal = aplusPlayers.length;
+  const firstGroupSold = firstGroupPlayers.filter((p) => p.soldTo).length;
+  const firstGroupTotal = firstGroupPlayers.length;
 
   // Group-level progress for the current group
   const currentGroupPlayers = currentGroup
@@ -253,32 +301,40 @@ export const AdminLive = () => {
     // SEQUENTIAL MODE: Groups one after another
     if (isSequentialMode) {
       // Skip current player to get the NEXT one
-      const nextPlayer = getNextSequentialPlayer(sortedPlayers, groupsList, currentPlayer?.id);
+      // Function signature: getNextSequentialPlayer(players, groups, skipPlayerId, groupOrder, groupRules)
+      const nextPlayer = getNextSequentialPlayer(
+        sortedPlayers,
+        groupsList,
+        currentPlayer?.id,
+        groupOrder,
+        groupRules,
+      );
       return nextPlayer;
     }
 
-    // OPEN AFTER A+ MODE: A+ first, then random
+    // OPEN AFTER FIRST GROUP MODE: First group first, then random
     if (auctionPhase === 1) {
-      // Phase 1: A+ round
-      const nextAplus = getNextAplusPlayer(
+      // Phase 1: First group round
+      const nextFirstGroup = getNextAplusPlayer(
         sortedPlayers,
         groupsList,
         unsoldAplusIds,
+        groupOrder,
       );
-      if (nextAplus) {
-        return nextAplus;
+      if (nextFirstGroup) {
+        return nextFirstGroup;
       }
 
-      // If no A+ left and all A+ are sold, we should transition to Phase 2
+      // If no first group left and all first group are sold, we should transition to Phase 2
       // But don't modify state here - just return what Phase 2 would return
       if (phase1Complete) {
-        return getRandomPlayer(sortedPlayers, groupsList);
+        return getRandomPlayer(sortedPlayers, groupsList, groupOrder);
       }
 
       return null;
     } else {
       // Phase 2: Random selection from remaining groups
-      return getRandomPlayer(sortedPlayers, groupsList);
+      return getRandomPlayer(sortedPlayers, groupsList, groupOrder);
     }
   };
 
@@ -294,10 +350,17 @@ export const AdminLive = () => {
         setAuctionPhase(2);
         setUnsoldAplusIds([]);
       }
-      
+
       // Clear unsold flag for re-auctioned A+ players
-      if (auctionPhase === 1 && nextPlayer.unsold && unsoldAplusIds.includes(nextPlayer.id)) {
-        const playerRef = ref(db, `auctions/${auctionId}/players/${nextPlayer.id}`);
+      if (
+        auctionPhase === 1 &&
+        nextPlayer.unsold &&
+        unsoldAplusIds.includes(nextPlayer.id)
+      ) {
+        const playerRef = ref(
+          db,
+          `auctions/${auctionId}/players/${nextPlayer.id}`,
+        );
         update(playerRef, { unsold: null }).catch((err) =>
           console.error("Error clearing unsold flag:", err),
         );
@@ -305,10 +368,13 @@ export const AdminLive = () => {
           prev.filter((id) => String(id) !== String(nextPlayer.id)),
         );
       }
-      
+
       // Clear unsold flag for Phase 2 re-auctioned players
       if (auctionPhase === 2 && nextPlayer.unsold) {
-        const playerRef = ref(db, `auctions/${auctionId}/players/${nextPlayer.id}`);
+        const playerRef = ref(
+          db,
+          `auctions/${auctionId}/players/${nextPlayer.id}`,
+        );
         update(playerRef, { unsold: null }).catch((err) =>
           console.error("Error clearing unsold flag:", err),
         );
@@ -340,7 +406,7 @@ export const AdminLive = () => {
 
     // Get sequential progress if in sequential mode
     const seqProgress = isSequentialMode
-      ? getSequentialProgress(sortedPlayers, groupsList)
+      ? getSequentialProgress(sortedPlayers, groupsList, groupOrder, groupRules)
       : null;
 
     update(liveStateRef, {
@@ -367,6 +433,7 @@ export const AdminLive = () => {
     sortedPlayers.length,
     isSequentialMode,
     groupsList.length, // Use length instead of array reference
+    groupRules,
   ]);
 
   // Initialize bid when switching to a new player (only when player ID changes)
@@ -391,24 +458,35 @@ export const AdminLive = () => {
 
     // SEQUENTIAL MODE: Start with next player in sequence
     if (isSequentialMode) {
-      const nextPlayer = getNextSequentialPlayer(sortedPlayers, groupsList);
+      const nextPlayer = getNextSequentialPlayer(
+        sortedPlayers,
+        groupsList,
+        undefined,
+        groupOrder,
+        groupRules,
+      );
       if (nextPlayer) {
         setCurrentPlayerId(nextPlayer.id);
       }
       return;
     }
 
-    // OPEN AFTER A+ MODE
-    // Check if we should be in Phase 2 (all A+ already sold)
+    // OPEN AFTER FIRST GROUP MODE
+    // Check if we should be in Phase 2 (all first group already sold)
     if (phase1Complete) {
       setAuctionPhase(2);
-      const nextPlayer = getRandomPlayer(sortedPlayers, groupsList);
+      const nextPlayer = getRandomPlayer(sortedPlayers, groupsList, groupOrder);
       if (nextPlayer) {
         setCurrentPlayerId(nextPlayer.id);
       }
     } else {
-      // Phase 1: Start with first A+ player
-      const nextPlayer = getNextAplusPlayer(sortedPlayers, groupsList, []);
+      // Phase 1: Start with first group player
+      const nextPlayer = getNextAplusPlayer(
+        sortedPlayers,
+        groupsList,
+        [],
+        groupOrder,
+      );
       if (nextPlayer) {
         setCurrentPlayerId(nextPlayer.id);
       } else {
@@ -425,6 +503,8 @@ export const AdminLive = () => {
     groupsList.length,
     initialAdvanceDone,
     isSequentialMode,
+    groupOrder,
+    groupRules,
   ]);
 
   // Play fanfare when auction completes
@@ -479,13 +559,13 @@ export const AdminLive = () => {
       play("unsold");
       setForceReauction(false); // Reset force flag
 
-      // Phase 1: Add A+ players to re-auction queue
-      const isAplusPlayer =
-        aplusGroup && String(currentPlayer.group_id) === String(aplusGroup.id);
-      if (auctionPhase === 1 && isAplusPlayer) {
+      // Phase 1: Add first-group players to re-auction queue
+      const isFirstGroupPlayer =
+        firstGroup && String(currentPlayer.group_id) === String(firstGroup.id);
+      if (auctionPhase === 1 && isFirstGroupPlayer) {
         setUnsoldAplusIds((prev) => [...prev, currentPlayer.id]);
         showToast(
-          `A+ player will be re-auctioned after other A+ players`,
+          `${firstGroup.group_name} player will be re-auctioned after other ${firstGroup.group_name} players`,
           "warning",
         );
       }
@@ -497,14 +577,14 @@ export const AdminLive = () => {
     }
   };
 
-  // List of unsold players (for the re-auction panel) - exclude A+ during Phase 1
+  // List of unsold players (for the re-auction panel) - exclude first-group during Phase 1
   const unsoldPlayersList = sortedPlayers.filter((p) => {
     if (!p.unsold || p.soldTo) return false;
-    // During Phase 1, A+ unsold players are handled separately via queue
+    // During Phase 1, first-group unsold players are handled separately via queue
     if (
       auctionPhase === 1 &&
-      aplusGroup &&
-      String(p.group_id) === String(aplusGroup.id)
+      firstGroup &&
+      String(p.group_id) === String(firstGroup.id)
     ) {
       return false;
     }
@@ -587,17 +667,19 @@ export const AdminLive = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-lightBg">
+      <div className="min-h-screen flex items-center justify-center bg-lightBg dark:bg-gray-900 transition-colors">
         <div className="text-center max-w-md">
           {hasError ? (
-            <div className="bg-red-100 border border-red-400 text-red-700 p-4 rounded mb-4">
+            <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-400 p-4 rounded mb-4">
               <p className="font-bold mb-2">Firebase Error:</p>
               <p className="text-sm">{hasError}</p>
             </div>
           ) : (
             <>
-              <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-primary mx-auto"></div>
-              <p className="text-textLight mt-4">Loading auction data...</p>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-primary dark:border-secondary mx-auto"></div>
+              <p className="text-textLight dark:text-gray-400 mt-4">
+                Loading auction data...
+              </p>
             </>
           )}
         </div>
@@ -607,12 +689,12 @@ export const AdminLive = () => {
 
   if (sortedPlayers.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-lightBg">
+      <div className="min-h-screen flex items-center justify-center bg-lightBg dark:bg-gray-900 transition-colors">
         <div className="text-center max-w-md">
-          <p className="text-xl text-textLight mb-4">
+          <p className="text-xl text-textLight dark:text-gray-300 mb-4">
             No players added to this auction!
           </p>
-          <p className="text-textLight mb-6">
+          <p className="text-textLight dark:text-gray-400 mb-6">
             Please add players before starting the live auction.
           </p>
           <a href={`/admin/players/${auctionId}`} className="btn btn-primary">
@@ -627,23 +709,25 @@ export const AdminLive = () => {
   if (isAuctionComplete) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary to-darkBg flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-2xl p-6 sm:p-8 max-w-lg w-full text-center">
-          <h1 className="text-2xl sm:text-3xl font-bold text-primary mb-2">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-6 sm:p-8 max-w-lg w-full text-center">
+          <h1 className="text-2xl sm:text-3xl font-bold text-primary dark:text-secondary mb-2">
             Auction Complete!
           </h1>
-          <p className="text-textLight mb-6">
+          <p className="text-textLight dark:text-gray-400 mb-6">
             All {sortedPlayers.length} players have been processed.
           </p>
 
           <div className="flex justify-center gap-8 mb-6">
             <div className="text-center">
               <p className="text-3xl font-bold text-success">{soldCount}</p>
-              <p className="text-sm text-textLight">Sold</p>
+              <p className="text-sm text-textLight dark:text-gray-400">Sold</p>
             </div>
             {unsoldCount > 0 && (
               <div className="text-center">
                 <p className="text-3xl font-bold text-danger">{unsoldCount}</p>
-                <p className="text-sm text-textLight">Unsold</p>
+                <p className="text-sm text-textLight dark:text-gray-400">
+                  Unsold
+                </p>
               </div>
             )}
           </div>
@@ -749,12 +833,12 @@ export const AdminLive = () => {
     const invalidCount = sortedPlayers.length - validPlayers.length;
 
     return (
-      <div className="min-h-screen flex items-center justify-center bg-lightBg">
+      <div className="min-h-screen flex items-center justify-center bg-lightBg dark:bg-gray-900 transition-colors">
         <div className="text-center max-w-lg">
-          <p className="text-xl text-textLight mb-4">
+          <p className="text-xl text-textLight dark:text-gray-300 mb-4">
             Player has invalid group assignment
           </p>
-          <p className="text-textLight mb-4">
+          <p className="text-textLight dark:text-gray-400 mb-4">
             Player <strong>"{currentPlayer?.player_name}"</strong> (#
             {currentPlayerIndex + 1}) has a group_id that doesn't match any
             group.
@@ -805,21 +889,21 @@ export const AdminLive = () => {
 
   // --- MAIN AUCTION UI ---
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary to-darkBg">
+    <div className="h-screen overflow-hidden bg-gradient-to-br from-primary to-darkBg flex flex-col">
       <Header showBranding={true} />
 
-      <div className="p-4">
-        <div className="max-w-7xl mx-auto">
+      <div className="flex-1 p-2 sm:p-4 overflow-auto">
+        <div className="max-w-7xl mx-auto h-full flex flex-col">
           {/* Auction Title */}
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-2 sm:mb-3">
             <div className="min-w-0">
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl sm:text-4xl font-bold text-secondary truncate">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-secondary truncate">
                   {auctionData?.name}
                 </h1>
                 {/* Phase/Mode Badge */}
                 <span
-                  className={`px-3 py-1 rounded-full text-xs font-bold ${
+                  className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold whitespace-nowrap ${
                     isSequentialMode
                       ? "bg-blue-500 text-white"
                       : auctionPhase === 1
@@ -828,83 +912,90 @@ export const AdminLive = () => {
                   }`}
                 >
                   {isSequentialMode
-                    ? `SEQUENTIAL: ${normalizeGroupName(currentGroup?.group_name) || "—"}`
+                    ? `SEQ: ${normalizeGroupName(currentGroup?.group_name) || "—"}`
                     : auctionPhase === 1
-                      ? "PHASE 1: A+ ROUND"
-                      : "PHASE 2: RANDOM"}
+                      ? "PHASE 1"
+                      : "PHASE 2"}
                 </span>
               </div>
-              <p className="text-gray-300 text-xs sm:text-base">
+              <p className="text-gray-300 text-[10px] sm:text-xs lg:text-sm">
                 {soldCount} sold, {unsoldCount} unsold, {remainingCount}{" "}
                 remaining
-                {!isSequentialMode && auctionPhase === 1 && aplusGroup && (
-                  <span className="ml-2 text-yellow-300">
-                    | A+: {aplusSold}/{aplusTotal} sold
+                {!isSequentialMode && auctionPhase === 1 && firstGroup && (
+                  <span className="ml-1 sm:ml-2 text-yellow-300">
+                    | {firstGroup.group_name}: {firstGroupSold}/
+                    {firstGroupTotal}
                     {unsoldAplusIds.length > 0 &&
-                      ` (${unsoldAplusIds.length} to re-auction)`}
+                      ` (+${unsoldAplusIds.length})`}
                   </span>
                 )}
                 {isSequentialMode && currentGroup && (
-                  <span className="ml-2 text-blue-300">
-                    | {normalizeGroupName(currentGroup.group_name)}:{" "}
+                  <span className="ml-1 sm:ml-2 text-blue-300">
+                    | {normalizeGroupName(currentGroup.group_name, groupRules)}:{" "}
                     {currentGroupPlayers.filter((p) => p.soldTo).length}/
-                    {currentGroupPlayers.length} sold
+                    {currentGroupPlayers.length}
                   </span>
                 )}
               </p>
             </div>
-            <div className="flex gap-2 sm:gap-3 flex-wrap">
+            <div className="flex gap-1 sm:gap-2 flex-wrap">
               <button
                 onClick={toggleMute}
-                className="btn btn-sm btn-secondary flex items-center gap-1"
+                className="btn btn-sm btn-secondary p-1.5 sm:p-2"
                 title={isMuted ? "Unmute sounds" : "Mute sounds"}
               >
                 {isMuted ? (
-                  <IoVolumeMute size={16} />
+                  <IoVolumeMute size={14} />
                 ) : (
-                  <IoVolumeHigh size={16} />
+                  <IoVolumeHigh size={14} />
                 )}
               </button>
               <button
                 onClick={() =>
                   window.open(ROUTES.PROJECTOR(auctionId), "_blank")
                 }
-                className="btn btn-sm btn-secondary flex items-center gap-1"
+                className="btn btn-sm btn-secondary p-1.5 sm:px-2 sm:py-1.5 flex items-center gap-1"
                 title="Open Projector Screen"
               >
-                <IoTv size={16} /> Projector
+                <IoTv size={14} />
+                <span className="hidden sm:inline text-xs">Projector</span>
               </button>
               <button
                 onClick={() => navigate(ROUTES.ADMIN_PLAYERS(auctionId))}
-                className="btn btn-sm sm:btn-sm btn-secondary flex items-center gap-1"
+                className="btn btn-sm btn-secondary p-1.5 sm:px-2 sm:py-1.5 flex items-center gap-1"
               >
-                <IoPeople size={16} /> Players
+                <IoPeople size={14} />
+                <span className="hidden sm:inline text-xs">Players</span>
               </button>
               <button
                 onClick={() => setShowStrategyInsights(!showStrategyInsights)}
-                className={`btn btn-sm flex items-center gap-1 ${showStrategyInsights ? "bg-purple-600 text-white" : "btn-secondary"}`}
+                className={`btn btn-sm p-1.5 sm:px-2 sm:py-1.5 flex items-center gap-1 ${showStrategyInsights ? "bg-purple-600 text-white" : "btn-secondary"}`}
                 title="Toggle Strategy Insights"
               >
-                <IoFlash size={16} /> Strategy
+                <IoFlash size={14} />
+                <span className="hidden sm:inline text-xs">Strategy</span>
               </button>
               <button
                 onClick={() => setAuctionPaused(!auctionPaused)}
-                className={`btn btn-sm flex items-center gap-1 ${auctionPaused ? "btn-success" : "btn-danger"}`}
+                className={`btn btn-sm p-1.5 sm:px-2 sm:py-1.5 flex items-center gap-1 ${auctionPaused ? "btn-success" : "btn-danger"}`}
               >
-                {auctionPaused ? <IoPlay size={16} /> : <IoPause size={16} />}
-                {auctionPaused ? "Resume" : "Pause"}
+                {auctionPaused ? <IoPlay size={14} /> : <IoPause size={14} />}
+                <span className="hidden sm:inline text-xs">
+                  {auctionPaused ? "Resume" : "Pause"}
+                </span>
               </button>
               {unsoldPlayersList.length > 0 && (
                 <button
                   onClick={() => setShowUnsoldPanel(true)}
-                  className="btn btn-sm btn-secondary flex items-center gap-1"
+                  className="btn btn-sm btn-secondary p-1.5 sm:px-2 sm:py-1.5 flex items-center gap-1"
                 >
-                  <IoRefresh size={16} /> Unsold ({unsoldPlayersList.length})
+                  <IoRefresh size={14} />
+                  <span className="text-xs">{unsoldPlayersList.length}</span>
                 </button>
               )}
               <button
                 onClick={() => undoLastBid(currentGroup?.base_price || 0)}
-                className="btn btn-sm btn-secondary"
+                className="btn btn-sm btn-secondary p-1.5 sm:px-2 sm:py-1.5 text-xs"
                 disabled={isPlayerProcessed || bidHistory.length === 0}
               >
                 Undo
@@ -913,8 +1004,8 @@ export const AdminLive = () => {
           </div>
 
           {/* Group Progress Bar */}
-          <div className="bg-white/10 rounded-lg p-3 mb-6">
-            <div className="flex items-center gap-3 overflow-x-auto">
+          <div className="bg-white/10 rounded-lg p-2 mb-2 sm:mb-3">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
               {groupsList.map((group) => {
                 const gPlayers = sortedPlayers.filter(
                   (p) => String(p.group_id) === String(group.id),
@@ -929,7 +1020,7 @@ export const AdminLive = () => {
                 return (
                   <div
                     key={group.id}
-                    className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-bold ${
+                    className={`flex-shrink-0 px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-bold ${
                       isActive
                         ? "bg-secondary text-primary"
                         : isComplete
@@ -937,22 +1028,24 @@ export const AdminLive = () => {
                           : "bg-white/5 text-gray-400"
                     }`}
                   >
-                    {group.group_name} ({gDone}/{gPlayers.length})
+                    {normalizeGroupName(group.group_name, groupRules) ||
+                      group.group_name}{" "}
+                    ({gDone}/{gPlayers.length})
                   </div>
                 );
               })}
             </div>
           </div>
 
-          {/* Main Content */}
-          <div className="grid lg:grid-cols-3 gap-6 lg:items-start">
+          {/* Main Content - Responsive Grid */}
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-2 sm:gap-4 min-h-0">
             {/* Player Card (Left) */}
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg shadow-xl overflow-hidden relative">
+            <div className="lg:col-span-1 min-h-0 flex flex-col">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-hidden relative flex-1 flex flex-col">
                 {/* Sold / Unsold badge */}
                 {isPlayerProcessed && (
                   <div
-                    className={`absolute top-4 right-4 z-10 px-4 py-1.5 rounded-full text-sm font-bold animate-fade-in-up ${
+                    className={`absolute top-2 right-2 z-10 px-2 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold animate-fade-in-up ${
                       currentPlayer.soldTo
                         ? "bg-success text-white"
                         : "bg-danger text-white"
@@ -962,11 +1055,11 @@ export const AdminLive = () => {
                   </div>
                 )}
 
-                {/* Hero Player Photo */}
-                <div className="relative w-full h-64 sm:h-80 lg:h-[28rem] bg-gradient-to-br from-primary to-accent">
+                {/* Hero Player Photo - Responsive height */}
+                <div className="relative w-full h-40 sm:h-52 lg:h-60 xl:h-72 bg-gradient-to-br from-primary to-accent flex-shrink-0">
                   {/* Initial as background fallback */}
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-7xl sm:text-8xl font-bold text-white/30">
+                    <span className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white/30">
                       {currentPlayer.player_name?.charAt(0)}
                     </span>
                   </div>
@@ -985,38 +1078,41 @@ export const AdminLive = () => {
                     />
                   )}
                   {/* Gradient overlay with name */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 sm:p-6">
-                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-1">
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 sm:p-4">
+                    <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-white mb-0.5">
                       {currentPlayer.player_name}
                     </h2>
-                    <div className="flex items-center gap-3">
-                      <span className="text-white/80 text-sm sm:text-base">
+                    <div className="flex items-center gap-2">
+                      <span className="text-white/80 text-xs sm:text-sm">
                         Age: {currentPlayer.age}
                       </span>
-                      <span className="bg-secondary text-primary px-2 py-0.5 rounded text-xs sm:text-sm font-bold">
-                        {currentGroup.group_name}
+                      <span className="bg-secondary text-primary px-1.5 py-0.5 rounded text-[10px] sm:text-xs font-bold">
+                        {normalizeGroupName(
+                          currentGroup.group_name,
+                          groupRules,
+                        ) || currentGroup.group_name}
                       </span>
                     </div>
                   </div>
                 </div>
 
                 {/* Compact Info Row */}
-                <div className="p-3 sm:p-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-textLight">
+                <div className="p-2 sm:p-3 flex-shrink-0">
+                  <div className="flex items-center justify-between text-xs sm:text-sm">
+                    <span className="text-textLight dark:text-gray-400">
                       Base:{" "}
-                      <span className="font-bold text-text">
+                      <span className="font-bold text-text dark:text-white">
                         ₹{(currentGroup.base_price || 0).toLocaleString()}
                       </span>
                     </span>
-                    <span className="text-textLight">
+                    <span className="text-textLight dark:text-gray-400">
                       Inc:{" "}
-                      <span className="font-bold text-text">
+                      <span className="font-bold text-text dark:text-white">
                         ₹{currentGroup.increment_value.toLocaleString()}
                       </span>
                     </span>
                     {currentGroup.max_bid_cap && (
-                      <span className="text-textLight">
+                      <span className="text-textLight dark:text-gray-400">
                         Cap:{" "}
                         <span className="font-bold text-danger">
                           ₹{currentGroup.max_bid_cap.toLocaleString()}
@@ -1025,7 +1121,7 @@ export const AdminLive = () => {
                     )}
                   </div>
                   {currentPlayer.soldTo && (
-                    <div className="flex justify-between mt-2 pt-2 border-t border-border text-sm">
+                    <div className="flex justify-between mt-1.5 pt-1.5 border-t border-border text-xs sm:text-sm">
                       <span className="text-textLight">
                         Sold To:{" "}
                         <span className="font-bold text-success">
@@ -1043,16 +1139,16 @@ export const AdminLive = () => {
                 </div>
               </div>
 
-              {/* Navigation */}
-              <div className="flex gap-4 mt-4">
+              {/* Navigation - Hidden on mobile when in bidding mode */}
+              <div className="hidden lg:flex gap-2 mt-2">
                 <button
                   onClick={() =>
                     setCurrentPlayerIndex(Math.max(0, currentPlayerIndex - 1))
                   }
                   disabled={currentPlayerIndex === 0}
-                  className="btn btn-sm flex-1 disabled:opacity-50"
+                  className="btn btn-sm flex-1 disabled:opacity-50 text-xs"
                 >
-                  <IoArrowBack /> Prev
+                  <IoArrowBack size={12} /> Prev
                 </button>
                 <button
                   onClick={() => {
@@ -1069,23 +1165,23 @@ export const AdminLive = () => {
                     }
                   }}
                   disabled={currentPlayerIndex === sortedPlayers.length - 1}
-                  className="btn btn-sm flex-1 disabled:opacity-50"
+                  className="btn btn-sm flex-1 disabled:opacity-50 text-xs"
                 >
-                  Next <IoArrowForward />
+                  Next <IoArrowForward size={12} />
                 </button>
               </div>
             </div>
 
             {/* Bidding Panel (Center) */}
-            <div className="lg:col-span-1 h-fit">
-              <div className="bg-white rounded-lg shadow-xl p-4 sm:p-6 text-center">
+            <div className="lg:col-span-1 min-h-0">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-3 sm:p-4 text-center h-full flex flex-col justify-center">
                 {isPlayerProcessed ? (
                   <div>
-                    <p className="text-textLight mb-2">
+                    <p className="text-textLight dark:text-gray-400 mb-1 text-xs sm:text-sm">
                       {currentPlayer.soldTo ? "Sold For" : "Status"}
                     </p>
                     <div
-                      className={`text-3xl sm:text-5xl font-bold mb-6 animate-fade-in-up ${
+                      className={`text-2xl sm:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 animate-fade-in-up ${
                         currentPlayer.soldTo ? "text-success" : "text-danger"
                       }`}
                     >
@@ -1094,7 +1190,7 @@ export const AdminLive = () => {
                         : "UNSOLD"}
                     </div>
                     {currentPlayer.soldTo && (
-                      <p className="text-lg text-text mb-6">
+                      <p className="text-sm sm:text-base text-text dark:text-white mb-3 sm:mb-4">
                         {
                           teamsList.find(
                             (t) =>
@@ -1109,39 +1205,43 @@ export const AdminLive = () => {
                         // Reset bid for new player
                         const nextPlayer = getNextPlayer();
                         if (nextPlayer) {
-                          const playerGroup = groupsList.find(g => String(g.id) === String(nextPlayer.group_id));
+                          const playerGroup = groupsList.find(
+                            (g) => String(g.id) === String(nextPlayer.group_id),
+                          );
                           if (playerGroup) {
                             resetBid(playerGroup.base_price || 0);
                           }
                         }
                       }}
                       disabled={!getNextPlayer()}
-                      className="w-full btn btn-primary disabled:opacity-50"
+                      className="w-full btn btn-primary disabled:opacity-50 text-sm"
                     >
                       Next Player
                     </button>
                   </div>
                 ) : (
                   <>
-                    <p className="text-textLight mb-2">Current Bid</p>
-                    <div className="mb-6 sm:mb-8 animate-pulse-bid">
+                    <p className="text-textLight dark:text-gray-400 mb-1 text-xs sm:text-sm">
+                      Current Bid
+                    </p>
+                    <div className="mb-3 sm:mb-4 animate-pulse-bid">
                       <AnimatedNumber
                         value={currentBid}
-                        className="text-4xl sm:text-6xl font-bold text-secondary"
+                        className="text-3xl sm:text-4xl lg:text-5xl font-bold text-secondary"
                       />
                     </div>
 
                     {auctionPaused && (
-                      <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-lg mb-6">
+                      <div className="bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-400 dark:border-yellow-600 text-yellow-700 dark:text-yellow-400 px-2 py-2 rounded-lg mb-3 text-xs sm:text-sm">
                         Auction is PAUSED
                       </div>
                     )}
 
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <button
                         onClick={handleIncrement}
                         disabled={auctionPaused}
-                        className="w-full btn btn-primary disabled:opacity-50 text-sm sm:text-base"
+                        className="w-full btn btn-primary disabled:opacity-50 text-xs sm:text-sm py-2"
                       >
                         Increment (+₹
                         {currentGroup.increment_value.toLocaleString()})
@@ -1153,7 +1253,7 @@ export const AdminLive = () => {
                           auctionPaused ||
                           currentBid <= (currentGroup.base_price || 0)
                         }
-                        className="w-full btn btn-secondary disabled:opacity-50 text-sm sm:text-base"
+                        className="w-full btn btn-secondary disabled:opacity-50 text-xs sm:text-sm py-2"
                       >
                         Decrement (-₹
                         {currentGroup.increment_value.toLocaleString()})
@@ -1163,16 +1263,16 @@ export const AdminLive = () => {
                         <button
                           onClick={() => setShowWinnerModal(true)}
                           disabled={auctionPaused}
-                          className="btn btn-success disabled:opacity-50 flex items-center justify-center gap-1 text-sm sm:text-base"
+                          className="btn btn-success disabled:opacity-50 flex items-center justify-center gap-1 text-xs sm:text-sm py-2"
                         >
-                          <IoCheckmark size={16} /> Sold
+                          <IoCheckmark size={14} /> Sold
                         </button>
                         <button
                           onClick={handleMarkUnsold}
                           disabled={auctionPaused}
-                          className="btn btn-danger disabled:opacity-50 flex items-center justify-center gap-1 text-sm sm:text-base"
+                          className="btn btn-danger disabled:opacity-50 flex items-center justify-center gap-1 text-xs sm:text-sm py-2"
                         >
-                          <IoClose size={16} /> Unsold
+                          <IoClose size={14} /> Unsold
                         </button>
                       </div>
                     </div>
@@ -1182,9 +1282,9 @@ export const AdminLive = () => {
             </div>
 
             {/* Teams Sidebar (Right) */}
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg shadow-xl p-3 sm:p-4">
-                <h3 className="text-base sm:text-lg font-bold text-primary mb-3">
+            <div className="lg:col-span-1 min-h-0 overflow-auto">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-2 sm:p-3">
+                <h3 className="text-sm sm:text-base font-bold text-primary dark:text-secondary mb-2">
                   Teams ({teamsList.length})
                 </h3>
                 <div className="space-y-1">
@@ -1196,7 +1296,7 @@ export const AdminLive = () => {
                       info && !info.canAfford && !isPlayerProcessed;
                     const isIneligible =
                       info && !info.eligible && !isPlayerProcessed;
-                    
+
                     // Get insight for this team if strategy panel is open
                     const insight = showStrategyInsights
                       ? teamInsights.find((i) => i.teamId === team.id)
@@ -1205,75 +1305,81 @@ export const AdminLive = () => {
                     return (
                       <div
                         key={team.id}
-                        className={`py-2 px-3 rounded-md border-l-4 transition group relative ${
+                        className={`py-1.5 px-2 rounded-md border-l-4 transition group relative ${
                           budgetExceeded
-                            ? "border-l-red-500 bg-red-50"
+                            ? "border-l-red-500 bg-red-50 dark:bg-red-900/30"
                             : isIneligible
-                              ? "border-l-orange-400 bg-orange-50"
-                              : "border-l-green-500 hover:bg-gray-50"
+                              ? "border-l-orange-400 bg-orange-50 dark:bg-orange-900/30"
+                              : "border-l-green-500 hover:bg-gray-50 dark:hover:bg-gray-700"
                         }`}
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm text-text truncate flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-xs sm:text-sm text-text dark:text-white truncate flex-1 min-w-0">
                             {team.team_name}
                           </span>
                           <span
-                            className={`text-xs font-semibold whitespace-nowrap ${budgetExceeded ? "text-red-600" : "text-textLight"}`}
+                            className={`text-[10px] sm:text-xs font-semibold whitespace-nowrap ${budgetExceeded ? "text-red-600" : "text-textLight dark:text-gray-400"}`}
                           >
                             ₹{(team.budget_remaining || 0).toLocaleString()}
                           </span>
-                          <span className="bg-primary/10 text-primary text-xs font-bold px-1.5 py-0.5 rounded whitespace-nowrap">
+                          <span className="bg-primary/10 dark:bg-primary/30 text-primary dark:text-secondary text-[10px] sm:text-xs font-bold px-1 py-0.5 rounded whitespace-nowrap">
                             {team.squad?.length || 0}/
                             {auctionData?.max_players_per_team || "∞"}
                           </span>
                           {isIneligible && (
                             <IoAlertCircle
                               className="text-red-500 flex-shrink-0"
-                              size={18}
+                              size={14}
                               title={info.reasons.join(" | ")}
                             />
                           )}
                           {showStrategyInsights && (
                             <button
                               onClick={() => setSelectedTeamInsight(team.id)}
-                              className="text-purple-600 hover:text-purple-800"
+                              className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300"
                               title="View full insights"
                             >
-                              <IoFlash size={16} />
+                              <IoFlash size={12} />
                             </button>
                           )}
                         </div>
-                        
+
                         {/* Strategy insight mini-view */}
                         {showStrategyInsights && insight && (
-                          <div className="mt-2 pt-2 border-t border-gray-200 text-xs">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${getRiskColorClass(insight.budgetAnalysis.riskLevel)}`}>
-                                {insight.budgetAnalysis.riskLevel.icon} {insight.budgetAnalysis.riskLevel.level}
+                          <div className="mt-1 pt-1 border-t border-gray-200 dark:border-gray-600 text-[10px] sm:text-xs">
+                            <div className="flex items-center gap-1 mb-0.5">
+                              <span
+                                className={`px-1 py-0.5 rounded font-semibold ${getRiskColorClass(insight.budgetAnalysis.riskLevel)}`}
+                              >
+                                {insight.budgetAnalysis.riskLevel.icon}{" "}
+                                {insight.budgetAnalysis.riskLevel.level}
                               </span>
-                              <span className="text-gray-500">
-                                Buffer: ₹{insight.budgetAnalysis.flexibleBudget.toLocaleString()}
+                              <span className="text-gray-500 dark:text-gray-400">
+                                ₹
+                                {insight.budgetAnalysis.flexibleBudget.toLocaleString()}
                               </span>
                             </div>
-                            {insight.bidRecommendation && insight.bidRecommendation.canBid && (
-                              <div className="text-gray-600">
-                                💡 Max safe: <span className="font-semibold text-green-700">₹{insight.bidRecommendation.maxSafeBid.toLocaleString()}</span>
-                              </div>
-                            )}
-                            {insight.warnings.length > 0 && (
-                              <div className="text-red-600 mt-1">
-                                {insight.warnings[0].icon} {insight.warnings[0].title}
-                              </div>
-                            )}
+                            {insight.bidRecommendation &&
+                              insight.bidRecommendation.canBid && (
+                                <div className="text-gray-600">
+                                  Max:{" "}
+                                  <span className="font-semibold text-green-700">
+                                    ₹
+                                    {insight.bidRecommendation.maxSafeBid.toLocaleString()}
+                                  </span>
+                                </div>
+                              )}
                           </div>
                         )}
-                        
+
                         {/* Tooltip on hover */}
-                        {isIneligible && info.reasons.length > 0 && !showStrategyInsights && (
-                          <div className="absolute bottom-full left-0 mb-1 hidden group-hover:block z-20 bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap shadow-lg">
-                            {info.reasons.join(" | ")}
-                          </div>
-                        )}
+                        {isIneligible &&
+                          info.reasons.length > 0 &&
+                          !showStrategyInsights && (
+                            <div className="absolute bottom-full left-0 mb-1 hidden group-hover:block z-20 bg-gray-900 text-white text-[10px] rounded px-1.5 py-1 whitespace-nowrap shadow-lg">
+                              {info.reasons.join(" | ")}
+                            </div>
+                          )}
                       </div>
                     );
                   })}
@@ -1282,241 +1388,280 @@ export const AdminLive = () => {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Unsold Players Panel */}
-        <Modal
-          isOpen={showUnsoldPanel}
-          title={`Unsold Players (${unsoldPlayersList.length})`}
-          onClose={() => setShowUnsoldPanel(false)}
-        >
-          {unsoldPlayersList.length === 0 ? (
-            <p className="text-textLight py-4 text-center">No unsold players</p>
-          ) : (
-            <div className="space-y-3 max-h-80 overflow-y-auto">
-              {unsoldPlayersList.map((player) => {
-                const group = groupsList.find(
-                  (g) => String(g.id) === String(player.group_id),
-                );
-                return (
-                  <div
-                    key={player.id}
-                    className="flex justify-between items-center p-3 border-2 border-border rounded-lg"
-                  >
-                    <div>
-                      <p className="font-bold text-text">
-                        {player.player_name}
-                      </p>
-                      <p className="text-xs text-textLight">
-                        {group?.group_name || "Unknown"} | Base: ₹
-                        {(group?.base_price || 0).toLocaleString()}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleReauction(player)}
-                      className="btn btn-sm btn-primary flex items-center gap-1"
-                    >
-                      <IoRefresh size={14} /> Re-auction
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Modal>
-
-        {/* Winner Selection Modal */}
-        <Modal
-          isOpen={showWinnerModal}
-          title={`Who bought ${currentPlayer.player_name}?`}
-          onClose={() => setShowWinnerModal(false)}
-        >
-          <p className="text-sm text-textLight mb-3">
-            Current Bid:{" "}
-            <span className="font-bold text-secondary">
-              ₹{currentBid.toLocaleString()}
-            </span>
-          </p>
-          <div className="space-y-3 max-h-60 overflow-y-auto">
-            {teamsList.map((team) => {
-              const info = teamEligibility.find((e) => e.teamId === team.id);
-              const disabled = info && !info.eligible;
-
+      {/* Unsold Players Panel */}
+      <Modal
+        isOpen={showUnsoldPanel}
+        title={`Unsold Players (${unsoldPlayersList.length})`}
+        onClose={() => setShowUnsoldPanel(false)}
+      >
+        {unsoldPlayersList.length === 0 ? (
+          <p className="text-textLight py-4 text-center">No unsold players</p>
+        ) : (
+          <div className="space-y-3 max-h-80 overflow-y-auto">
+            {unsoldPlayersList.map((player) => {
+              const group = groupsList.find(
+                (g) => String(g.id) === String(player.group_id),
+              );
               return (
-                <button
-                  key={team.id}
-                  onClick={() => handleSoldToTeam(team.id)}
-                  disabled={disabled}
-                  className={`w-full p-4 text-left border-2 rounded-lg transition flex items-start gap-3 ${
-                    disabled
-                      ? "border-gray-200 bg-gray-100 opacity-50 cursor-not-allowed"
-                      : "border-border hover:border-primary hover:bg-lightBg"
-                  }`}
+                <div
+                  key={player.id}
+                  className="flex justify-between items-center p-3 border-2 border-border rounded-lg"
                 >
-                  {team.team_logo && (
-                    <img
-                      src={getImagePath("team-logo", team.team_logo)}
-                      alt={team.team_name}
-                      className="w-12 h-12 object-contain rounded border border-border flex-shrink-0"
-                      onError={(e) => {
-                        e.target.style.display = "none";
-                      }}
-                    />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div
-                      className={`font-bold ${disabled ? "text-gray-400" : "text-primary"}`}
-                    >
-                      {team.team_name}
-                    </div>
-                    <div className="text-sm text-textLight">
-                      {team.owner_name}
-                    </div>
-                    <div className="text-sm font-semibold text-text mt-1">
-                      Remaining: ₹
-                      {(team.budget_remaining || 0).toLocaleString()}
-                      {auctionData?.max_players_per_team && (
-                        <span className="ml-2">
-                          | Squad: {team.squad?.length || 0}/
-                          {auctionData.max_players_per_team}
-                        </span>
-                      )}
-                      {currentGroup?.max_per_team && info && (
-                        <span className="ml-2">
-                          | Group: {info.groupCount}/{currentGroup.max_per_team}
-                        </span>
-                      )}
-                    </div>
-                    {disabled && info.reasons.length > 0 && (
-                      <div className="text-xs text-red-500 font-semibold mt-1">
-                        {info.reasons.join(" | ")}
-                      </div>
-                    )}
+                  <div>
+                    <p className="font-bold text-text">{player.player_name}</p>
+                    <p className="text-xs text-textLight">
+                      {group?.group_name || "Unknown"} | Base: ₹
+                      {(group?.base_price || 0).toLocaleString()}
+                    </p>
                   </div>
-                </button>
+                  <button
+                    onClick={() => handleReauction(player)}
+                    className="btn btn-sm btn-primary flex items-center gap-1"
+                  >
+                    <IoRefresh size={14} /> Re-auction
+                  </button>
+                </div>
               );
             })}
           </div>
-        </Modal>
+        )}
+      </Modal>
 
-        {/* Strategy Insights Detail Modal */}
-        <Modal
-          isOpen={selectedTeamInsight !== null}
-          title={`Strategy Insights - ${selectedInsight?.teamName || "Team"}`}
-          onClose={() => setSelectedTeamInsight(null)}
-        >
-          {selectedInsight && (
-            <div className="space-y-4 max-h-[70vh] overflow-y-auto">
-              {/* Budget Summary */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-bold text-primary mb-2 flex items-center gap-2">
-                  💰 Budget Analysis
-                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getRiskColorClass(selectedInsight.budgetAnalysis.riskLevel)}`}>
-                    {selectedInsight.budgetAnalysis.riskLevel.icon} {selectedInsight.budgetAnalysis.riskLevel.level}
-                  </span>
-                </h4>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <span className="text-gray-500">Remaining:</span>
-                    <span className="font-semibold ml-1">₹{selectedInsight.budgetAnalysis.budget.toLocaleString()}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Slots Left:</span>
-                    <span className="font-semibold ml-1">{selectedInsight.budgetAnalysis.slotsRemaining}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Must Reserve:</span>
-                    <span className="font-semibold ml-1 text-orange-600">₹{selectedInsight.budgetAnalysis.mandatoryReserve.toLocaleString()}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Flexible:</span>
-                    <span className={`font-semibold ml-1 ${selectedInsight.budgetAnalysis.flexibleBudget < 300 ? "text-red-600" : "text-green-600"}`}>
-                      ₹{selectedInsight.budgetAnalysis.flexibleBudget.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              </div>
+      {/* Winner Selection Modal */}
+      <Modal
+        isOpen={showWinnerModal}
+        title={`Who bought ${currentPlayer.player_name}?`}
+        onClose={() => setShowWinnerModal(false)}
+      >
+        <p className="text-sm text-textLight mb-3">
+          Current Bid:{" "}
+          <span className="font-bold text-secondary">
+            ₹{currentBid.toLocaleString()}
+          </span>
+        </p>
+        <div className="space-y-3 max-h-60 overflow-y-auto">
+          {teamsList.map((team) => {
+            const info = teamEligibility.find((e) => e.teamId === team.id);
+            const disabled = info && !info.eligible;
 
-              {/* Bid Recommendation */}
-              {selectedInsight.bidRecommendation && currentPlayer && (
-                <div className="bg-purple-50 rounded-lg p-4">
-                  <h4 className="font-bold text-purple-700 mb-2">🎯 Bid Recommendation</h4>
-                  <p className="text-sm text-gray-700 mb-2">
-                    <span className="font-semibold">For {currentPlayer.player_name}:</span> {selectedInsight.bidRecommendation.reason}
-                  </p>
-                  {selectedInsight.bidRecommendation.canBid ? (
-                    <div className="grid grid-cols-3 gap-2 text-sm">
-                      <div className="bg-green-100 rounded p-2 text-center">
-                        <div className="text-xs text-green-600">Conservative</div>
-                        <div className="font-bold text-green-700">₹{selectedInsight.bidRecommendation.conservativeBid.toLocaleString()}</div>
-                      </div>
-                      <div className="bg-yellow-100 rounded p-2 text-center">
-                        <div className="text-xs text-yellow-600">Balanced</div>
-                        <div className="font-bold text-yellow-700">₹{selectedInsight.bidRecommendation.balancedBid.toLocaleString()}</div>
-                      </div>
-                      <div className="bg-red-100 rounded p-2 text-center">
-                        <div className="text-xs text-red-600">Max Safe</div>
-                        <div className="font-bold text-red-700">₹{selectedInsight.bidRecommendation.maxSafeBid.toLocaleString()}</div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-red-100 text-red-700 rounded p-2 text-sm">
-                      ⚠️ {selectedInsight.bidRecommendation.reason}
+            return (
+              <button
+                key={team.id}
+                onClick={() => handleSoldToTeam(team.id)}
+                disabled={disabled}
+                className={`w-full p-4 text-left border-2 rounded-lg transition flex items-start gap-3 ${
+                  disabled
+                    ? "border-gray-200 bg-gray-100 opacity-50 cursor-not-allowed"
+                    : "border-border hover:border-primary hover:bg-lightBg"
+                }`}
+              >
+                {team.team_logo && (
+                  <img
+                    src={getImagePath("team-logo", team.team_logo)}
+                    alt={team.team_name}
+                    className="w-12 h-12 object-contain rounded border border-border flex-shrink-0"
+                    onError={(e) => {
+                      e.target.style.display = "none";
+                    }}
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div
+                    className={`font-bold ${disabled ? "text-gray-400" : "text-primary"}`}
+                  >
+                    {team.team_name}
+                  </div>
+                  <div className="text-sm text-textLight">
+                    {team.owner_name}
+                  </div>
+                  <div className="text-sm font-semibold text-text mt-1">
+                    Remaining: ₹{(team.budget_remaining || 0).toLocaleString()}
+                    {auctionData?.max_players_per_team && (
+                      <span className="ml-2">
+                        | Squad: {team.squad?.length || 0}/
+                        {auctionData.max_players_per_team}
+                      </span>
+                    )}
+                    {currentGroup?.max_per_team && info && (
+                      <span className="ml-2">
+                        | Group: {info.groupCount}/{currentGroup.max_per_team}
+                      </span>
+                    )}
+                  </div>
+                  {disabled && info.reasons.length > 0 && (
+                    <div className="text-xs text-red-500 font-semibold mt-1">
+                      {info.reasons.join(" | ")}
                     </div>
                   )}
                 </div>
-              )}
+              </button>
+            );
+          })}
+        </div>
+      </Modal>
 
-              {/* Group Requirements */}
-              <div className="bg-blue-50 rounded-lg p-4">
-                <h4 className="font-bold text-blue-700 mb-2">📊 Group Requirements</h4>
-                <div className="space-y-2">
-                  {selectedInsight.groupOpportunities.map((opp) => (
-                    <div key={opp.group} className="flex items-center justify-between text-sm">
-                      <span className="font-semibold">{opp.group}</span>
-                      <div className="flex items-center gap-2">
-                        <span className={opp.fulfilled ? "text-green-600" : "text-orange-600"}>
-                          {opp.current}/{opp.min}
-                        </span>
-                        {opp.fulfilled ? (
-                          <span className="text-green-600 text-xs">✅</span>
-                        ) : (
-                          <span className="text-orange-600 text-xs">Need {opp.needed}</span>
-                        )}
-                        {opp.urgent && !opp.fulfilled && (
-                          <span className="text-red-600 text-xs">⚠️ Only {opp.available} left!</span>
-                        )}
+      {/* Strategy Insights Detail Modal */}
+      <Modal
+        isOpen={selectedTeamInsight !== null}
+        title={`Strategy Insights - ${selectedInsight?.teamName || "Team"}`}
+        onClose={() => setSelectedTeamInsight(null)}
+      >
+        {selectedInsight && (
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+            {/* Budget Summary */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h4 className="font-bold text-primary mb-2 flex items-center gap-2">
+                💰 Budget Analysis
+                <span
+                  className={`px-2 py-0.5 rounded text-xs font-semibold ${getRiskColorClass(selectedInsight.budgetAnalysis.riskLevel)}`}
+                >
+                  {selectedInsight.budgetAnalysis.riskLevel.icon}{" "}
+                  {selectedInsight.budgetAnalysis.riskLevel.level}
+                </span>
+              </h4>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-gray-500">Remaining:</span>
+                  <span className="font-semibold ml-1">
+                    ₹{selectedInsight.budgetAnalysis.budget.toLocaleString()}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Slots Left:</span>
+                  <span className="font-semibold ml-1">
+                    {selectedInsight.budgetAnalysis.slotsRemaining}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Must Reserve:</span>
+                  <span className="font-semibold ml-1 text-orange-600">
+                    ₹
+                    {selectedInsight.budgetAnalysis.mandatoryReserve.toLocaleString()}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Flexible:</span>
+                  <span
+                    className={`font-semibold ml-1 ${selectedInsight.budgetAnalysis.flexibleBudget < 300 ? "text-red-600" : "text-green-600"}`}
+                  >
+                    ₹
+                    {selectedInsight.budgetAnalysis.flexibleBudget.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Bid Recommendation */}
+            {selectedInsight.bidRecommendation && currentPlayer && (
+              <div className="bg-purple-50 rounded-lg p-4">
+                <h4 className="font-bold text-purple-700 mb-2">
+                  🎯 Bid Recommendation
+                </h4>
+                <p className="text-sm text-gray-700 mb-2">
+                  <span className="font-semibold">
+                    For {currentPlayer.player_name}:
+                  </span>{" "}
+                  {selectedInsight.bidRecommendation.reason}
+                </p>
+                {selectedInsight.bidRecommendation.canBid ? (
+                  <div className="grid grid-cols-3 gap-2 text-sm">
+                    <div className="bg-green-100 rounded p-2 text-center">
+                      <div className="text-xs text-green-600">Conservative</div>
+                      <div className="font-bold text-green-700">
+                        ₹
+                        {selectedInsight.bidRecommendation.conservativeBid.toLocaleString()}
                       </div>
+                    </div>
+                    <div className="bg-yellow-100 rounded p-2 text-center">
+                      <div className="text-xs text-yellow-600">Balanced</div>
+                      <div className="font-bold text-yellow-700">
+                        ₹
+                        {selectedInsight.bidRecommendation.balancedBid.toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="bg-red-100 rounded p-2 text-center">
+                      <div className="text-xs text-red-600">Max Safe</div>
+                      <div className="font-bold text-red-700">
+                        ₹
+                        {selectedInsight.bidRecommendation.maxSafeBid.toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-red-100 text-red-700 rounded p-2 text-sm">
+                    ⚠️ {selectedInsight.bidRecommendation.reason}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Group Requirements */}
+            <div className="bg-blue-50 rounded-lg p-4">
+              <h4 className="font-bold text-blue-700 mb-2">
+                📊 Group Requirements
+              </h4>
+              <div className="space-y-2">
+                {selectedInsight.groupOpportunities.map((opp) => (
+                  <div
+                    key={opp.group}
+                    className="flex items-center justify-between text-sm"
+                  >
+                    <span className="font-semibold">{opp.group}</span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={
+                          opp.fulfilled ? "text-green-600" : "text-orange-600"
+                        }
+                      >
+                        {opp.current}/{opp.min}
+                      </span>
+                      {opp.fulfilled ? (
+                        <span className="text-green-600 text-xs">✅</span>
+                      ) : (
+                        <span className="text-orange-600 text-xs">
+                          Need {opp.needed}
+                        </span>
+                      )}
+                      {opp.urgent && !opp.fulfilled && (
+                        <span className="text-red-600 text-xs">
+                          ⚠️ Only {opp.available} left!
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Warnings */}
+            {selectedInsight.warnings.length > 0 && (
+              <div className="bg-red-50 rounded-lg p-4">
+                <h4 className="font-bold text-red-700 mb-2">⚠️ Warnings</h4>
+                <div className="space-y-2">
+                  {selectedInsight.warnings.map((warning, idx) => (
+                    <div key={idx} className="text-sm">
+                      <span className="font-semibold">
+                        {warning.icon} {warning.title}
+                      </span>
+                      <p className="text-gray-600 text-xs">{warning.message}</p>
                     </div>
                   ))}
                 </div>
               </div>
+            )}
 
-              {/* Warnings */}
-              {selectedInsight.warnings.length > 0 && (
-                <div className="bg-red-50 rounded-lg p-4">
-                  <h4 className="font-bold text-red-700 mb-2">⚠️ Warnings</h4>
-                  <div className="space-y-2">
-                    {selectedInsight.warnings.map((warning, idx) => (
-                      <div key={idx} className="text-sm">
-                        <span className="font-semibold">{warning.icon} {warning.title}</span>
-                        <p className="text-gray-600 text-xs">{warning.message}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Summary */}
-              <div className="text-center text-sm text-gray-600 border-t pt-3">
-                {selectedInsight.summary}
-              </div>
+            {/* Summary */}
+            <div className="text-center text-sm text-gray-600 border-t pt-3">
+              {selectedInsight.summary}
             </div>
-          )}
-        </Modal>
+          </div>
+        )}
+      </Modal>
 
-        {/* Toast Notifications */}
-        <ToastContainer toasts={toasts} removeToast={removeToast} />
-      </div>
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
   );
 };

@@ -35,28 +35,30 @@ export const Modal = ({
         if (e.target === e.currentTarget) onClose?.();
       }}
     >
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 animate-fade-in-up">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 animate-fade-in-up">
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-border">
-          <h2 className="text-xl font-bold text-text">{title}</h2>
+        <div className="flex justify-between items-center p-6 border-b border-border dark:border-gray-700">
+          <h2 className="text-xl font-bold text-text dark:text-white">
+            {title}
+          </h2>
           <button
             onClick={onClose}
-            className="text-textLight hover:text-text transition"
+            className="text-textLight dark:text-gray-400 hover:text-text dark:hover:text-white transition"
           >
             <IoClose size={24} />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6">{children}</div>
+        <div className="p-6 text-text dark:text-gray-200">{children}</div>
 
         {/* Footer */}
         {(onConfirm || onCancel) && (
-          <div className="flex gap-3 p-6 border-t border-border justify-end">
+          <div className="flex gap-3 p-6 border-t border-border dark:border-gray-700 justify-end">
             {onCancel && (
               <button
                 onClick={onCancel}
-                className="px-4 py-2 rounded border border-border text-text hover:bg-lightBg transition"
+                className="px-4 py-2 rounded border border-border dark:border-gray-600 text-text dark:text-gray-200 hover:bg-lightBg dark:hover:bg-gray-700 transition"
               >
                 {cancelText}
               </button>

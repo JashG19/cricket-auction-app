@@ -24,15 +24,27 @@ export const RISK_LEVELS = {
  * @param {Object} team - Team object
  * @param {Object} groupCounts - Current players per group
  * @param {string} currentGroupName - Group of player being auctioned (normalized)
+ * @param {Object} groupRules - Group rules object (defaults to GROUP_RULES)
+ * @param {number} totalPlayersPerTeam - Total players per team (defaults to TOTAL_PLAYERS_PER_TEAM)
  * @returns {Object} Budget analysis
  */
-export const analyzeBudget = (team, groupCounts, currentGroupName = null) => {
+export const analyzeBudget = (
+  team,
+  groupCounts,
+  currentGroupName = null,
+  groupRules = GROUP_RULES,
+  totalPlayersPerTeam = TOTAL_PLAYERS_PER_TEAM,
+) => {
   const budget = Number(team.budget_remaining) || 0;
   const squadSize = team.squad?.length || 0;
-  const slotsRemaining = TOTAL_PLAYERS_PER_TEAM - squadSize;
+  const slotsRemaining = totalPlayersPerTeam - squadSize;
 
   // Calculate mandatory reserve (minimum needed to fill remaining slots)
-  const mandatoryReserve = calculateMinReserve(groupCounts, currentGroupName);
+  const mandatoryReserve = calculateMinReserve(
+    groupCounts,
+    currentGroupName,
+    groupRules,
+  );
 
   // Flexible budget = what's left after setting aside mandatory reserve
   const flexibleBudget = Math.max(0, budget - mandatoryReserve);
@@ -72,19 +84,27 @@ export const analyzeBudget = (team, groupCounts, currentGroupName = null) => {
  * @param {Object} team - Team object
  * @param {Object} groupCounts - Current players per group
  * @param {string} currentGroupName - Group being bid on (normalized)
+ * @param {Object} groupRules - Group rules object (defaults to GROUP_RULES)
+ * @param {number} totalPlayersPerTeam - Total players per team (defaults to TOTAL_PLAYERS_PER_TEAM)
  * @returns {Object} Bid limits
  */
 export const calculateBidLimits = (
   team,
   groupCounts,
   currentGroupName = null,
+  groupRules = GROUP_RULES,
+  totalPlayersPerTeam = TOTAL_PLAYERS_PER_TEAM,
 ) => {
   const budget = Number(team.budget_remaining) || 0;
   const squadSize = team.squad?.length || 0;
-  const slotsRemaining = TOTAL_PLAYERS_PER_TEAM - squadSize;
+  const slotsRemaining = totalPlayersPerTeam - squadSize;
 
   // Reserve needed AFTER buying this player (one less slot)
-  const reserveAfterBuy = calculateMinReserve(groupCounts, currentGroupName);
+  const reserveAfterBuy = calculateMinReserve(
+    groupCounts,
+    currentGroupName,
+    groupRules,
+  );
 
   // Maximum safe bid = budget - reserve needed after buying
   const maxSafeBid = Math.max(0, budget - reserveAfterBuy);
@@ -114,19 +134,25 @@ export const calculateBidLimits = (
  * @param {Object} groupCounts - Current players per group
  * @param {Array} players - All players
  * @param {Array} groups - All groups
+ * @param {Object} groupRules - Group rules object (defaults to GROUP_RULES)
  * @returns {Array} Group opportunities
  */
-export const analyzeGroupOpportunities = (groupCounts, players, groups) => {
+export const analyzeGroupOpportunities = (
+  groupCounts,
+  players,
+  groups,
+  groupRules = GROUP_RULES,
+) => {
   const opportunities = [];
 
-  Object.entries(GROUP_RULES).forEach(([groupName, rule]) => {
+  Object.entries(groupRules).forEach(([groupName, rule]) => {
     const current = groupCounts[groupName] || 0;
     const needed = Math.max(0, rule.minPerTeam - current);
     const canAdd = rule.maxPerTeam - current;
 
     // Find matching group in Firebase data
     const group = groups.find(
-      (g) => normalizeGroupName(g.group_name) === groupName,
+      (g) => normalizeGroupName(g.group_name, groupRules) === groupName,
     );
     if (!group) return;
 
@@ -153,9 +179,9 @@ export const analyzeGroupOpportunities = (groupCounts, players, groups) => {
       min: rule.minPerTeam,
       max: rule.maxPerTeam,
       needed,
-      stillNeed: needed,  // Alias for UI
+      stillNeed: needed, // Alias for UI
       canAdd,
-      canBuyMore: canAdd,  // Alias for UI
+      canBuyMore: canAdd, // Alias for UI
       available,
       cheapestPlayer: cheapest?.player_name || null,
       cheapestPrice: rule.basePrice,
@@ -257,6 +283,7 @@ export const generateRiskWarnings = (
  * @param {Object} groupCounts - Team's current group counts
  * @param {number} currentBid - Current bid amount
  * @param {Array} competingTeams - Other teams that need this group
+ * @param {Object} groupRules - Group rules object (defaults to GROUP_RULES)
  * @returns {Object} Bid recommendations
  */
 export const generateBidRecommendation = (
@@ -266,15 +293,21 @@ export const generateBidRecommendation = (
   groupCounts,
   currentBid,
   competingTeams = [],
+  groupRules = GROUP_RULES,
 ) => {
-  const groupName = normalizeGroupName(currentGroup?.group_name);
-  const rule = GROUP_RULES[groupName];
+  const groupName = normalizeGroupName(currentGroup?.group_name, groupRules);
+  const rule = groupRules[groupName];
 
   if (!rule) {
     return { recommendation: null, reason: "Unknown group" };
   }
 
-  const bidLimits = calculateBidLimits(team, groupCounts, groupName);
+  const bidLimits = calculateBidLimits(
+    team,
+    groupCounts,
+    groupName,
+    groupRules,
+  );
   const current = groupCounts[groupName] || 0;
   const needsThisGroup = current < rule.minPerTeam;
   const canTakeMore = current < rule.maxPerTeam;
@@ -353,6 +386,8 @@ export const generateBidRecommendation = (
  * @param {Object} currentGroup - Current player's group (optional)
  * @param {number} currentBid - Current bid amount (optional)
  * @param {Array} allTeams - All teams (for competition analysis)
+ * @param {Object} groupRules - Group rules object (defaults to GROUP_RULES)
+ * @param {number} totalPlayersPerTeam - Total players per team (defaults to TOTAL_PLAYERS_PER_TEAM)
  * @returns {Object} Complete strategy insights
  */
 export const generateTeamInsights = (
@@ -363,21 +398,35 @@ export const generateTeamInsights = (
   currentGroup = null,
   currentBid = 0,
   allTeams = [],
+  groupRules = GROUP_RULES,
+  totalPlayersPerTeam = TOTAL_PLAYERS_PER_TEAM,
 ) => {
   // Get team's current group counts
-  const groupCounts = getTeamGroupCounts(team.squad, players, groups);
+  const groupCounts = getTeamGroupCounts(
+    team.squad,
+    players,
+    groups,
+    groupRules,
+  );
   const normalizedGroupName = currentGroup
-    ? normalizeGroupName(currentGroup.group_name)
+    ? normalizeGroupName(currentGroup.group_name, groupRules)
     : null;
 
   // Budget analysis
-  const budgetAnalysis = analyzeBudget(team, groupCounts, normalizedGroupName);
+  const budgetAnalysis = analyzeBudget(
+    team,
+    groupCounts,
+    normalizedGroupName,
+    groupRules,
+    totalPlayersPerTeam,
+  );
 
   // Group opportunities
   const groupOpportunities = analyzeGroupOpportunities(
     groupCounts,
     players,
     groups,
+    groupRules,
   );
 
   // Risk warnings
@@ -391,7 +440,7 @@ export const generateTeamInsights = (
   let canBidOnCurrentPlayer = true;
   if (currentPlayer && currentGroup && normalizedGroupName) {
     const currentGroupCount = groupCounts[normalizedGroupName] || 0;
-    const rule = GROUP_RULES[normalizedGroupName];
+    const rule = groupRules[normalizedGroupName];
     if (rule && currentGroupCount >= rule.maxPerTeam) {
       canBidOnCurrentPlayer = false;
       warnings.unshift({
@@ -416,9 +465,14 @@ export const generateTeamInsights = (
     // Find competing teams (others that need this group and can afford it)
     const competingTeams = allTeams.filter((t) => {
       if (String(t.id) === String(team.id)) return false;
-      const theirCounts = getTeamGroupCounts(t.squad, players, groups);
+      const theirCounts = getTeamGroupCounts(
+        t.squad,
+        players,
+        groups,
+        groupRules,
+      );
       const theirCurrent = theirCounts[normalizedGroupName] || 0;
-      const rule = GROUP_RULES[normalizedGroupName];
+      const rule = groupRules[normalizedGroupName];
       return (
         rule &&
         theirCurrent < rule.minPerTeam &&
@@ -433,6 +487,7 @@ export const generateTeamInsights = (
       groupCounts,
       currentBid,
       competingTeams,
+      groupRules,
     );
   }
 

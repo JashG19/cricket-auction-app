@@ -353,7 +353,7 @@ export const AdminPlayers = () => {
           <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold">
             SOLD
           </span>
-          <p className="text-xs text-textLight mt-1">
+          <p className="text-xs text-textLight dark:text-gray-400 mt-1">
             {team?.team_name || "Unknown"} - ₹
             {(player.soldPrice || 0).toLocaleString()}
           </p>
@@ -362,13 +362,13 @@ export const AdminPlayers = () => {
     }
     if (player.unsold) {
       return (
-        <span className="bg-red-100 text-red-700 px-2 py-1 rounded-full text-xs font-bold">
+        <span className="bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 px-2 py-1 rounded-full text-xs font-bold">
           UNSOLD
         </span>
       );
     }
     return (
-      <span className="bg-gray-100 text-gray-500 px-2 py-1 rounded-full text-xs font-bold">
+      <span className="bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-2 py-1 rounded-full text-xs font-bold">
         PENDING
       </span>
     );
@@ -543,7 +543,7 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
   );
 
   return (
-    <div className="min-h-screen bg-lightBg">
+    <div className="min-h-screen bg-lightBg dark:bg-gray-900 transition-colors duration-300">
       {/* Header */}
       <Header showBranding={true} />
 
@@ -552,10 +552,10 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
           {/* Page Title */}
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
             <div className="min-w-0">
-              <h1 className="text-2xl sm:text-4xl font-bold text-primary">
+              <h1 className="text-2xl sm:text-4xl font-bold text-primary dark:text-secondary">
                 Manage Players
               </h1>
-              <p className="text-textLight text-sm">
+              <p className="text-textLight dark:text-gray-400 text-sm">
                 {selectedGroup === "all"
                   ? `Total Players: ${playersList.length}`
                   : `Showing ${filteredPlayers.length} of ${playersList.length} players`}
@@ -603,7 +603,7 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
           {/* Group Filter Bar */}
           {groupsList.length > 0 && playersList.length > 0 && (
             <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-2">
-              <span className="text-sm font-semibold text-textLight mr-1">
+              <span className="text-sm font-semibold text-textLight dark:text-gray-400 mr-1">
                 Group:
               </span>
               <button
@@ -611,7 +611,7 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
                 className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
                   selectedGroup === "all"
                     ? "bg-primary text-white"
-                    : "bg-white border border-border text-textLight hover:border-primary"
+                    : "bg-white dark:bg-gray-700 border border-border dark:border-gray-600 text-textLight dark:text-gray-300 hover:border-primary dark:hover:border-secondary"
                 }`}
               >
                 All ({playersList.length})
@@ -625,7 +625,7 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
                     className={`px-4 py-2 rounded-lg text-sm font-bold transition flex-shrink-0 ${
                       selectedGroup === String(group.id)
                         ? "bg-primary text-white"
-                        : "bg-white border border-border text-textLight hover:border-primary"
+                        : "bg-white dark:bg-gray-700 border border-border dark:border-gray-600 text-textLight dark:text-gray-300 hover:border-primary dark:hover:border-secondary"
                     }`}
                   >
                     {group.group_name} ({count})
@@ -639,7 +639,7 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
           {playersList.length > 0 &&
             (statusCounts.sold > 0 || statusCounts.unsold > 0) && (
               <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-2">
-                <span className="text-sm font-semibold text-textLight mr-1">
+                <span className="text-sm font-semibold text-textLight dark:text-gray-400 mr-1">
                   Status:
                 </span>
                 {[
@@ -669,7 +669,7 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
                     className={`px-4 py-2 rounded-lg text-sm font-bold transition flex-shrink-0 ${
                       selectedStatus === s.key
                         ? "bg-primary text-white"
-                        : "bg-white border border-border text-textLight hover:border-primary"
+                        : "bg-white dark:bg-gray-700 border border-border dark:border-gray-600 text-textLight dark:text-gray-300 hover:border-primary dark:hover:border-secondary"
                     }`}
                   >
                     {s.label} ({s.count})
@@ -682,7 +682,7 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
           <div className="card">
             {playersList.length === 0 ? (
               <div className="py-12 text-center">
-                <p className="text-lg text-textLight mb-4">
+                <p className="text-lg text-textLight dark:text-gray-400 mb-4">
                   No players added yet
                 </p>
                 <button onClick={openAddModal} className="btn btn-primary">
@@ -691,7 +691,7 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
               </div>
             ) : filteredPlayers.length === 0 ? (
               <div className="py-12 text-center">
-                <p className="text-lg text-textLight">
+                <p className="text-lg text-textLight dark:text-gray-400">
                   No players in this group
                 </p>
               </div>
@@ -699,26 +699,26 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
               <div className="overflow-x-auto">
                 <table className="w-full table-improved">
                   <thead>
-                    <tr className="border-b-2 border-border">
-                      <th className="text-left py-4 px-4 font-bold text-primary">
+                    <tr className="border-b-2 border-border dark:border-gray-600">
+                      <th className="text-left py-4 px-4 font-bold text-primary dark:text-secondary">
                         #
                       </th>
-                      <th className="text-left py-4 px-4 font-bold text-primary">
+                      <th className="text-left py-4 px-4 font-bold text-primary dark:text-secondary">
                         Player Name
                       </th>
-                      <th className="text-left py-4 px-4 font-bold text-primary">
+                      <th className="text-left py-4 px-4 font-bold text-primary dark:text-secondary">
                         Age
                       </th>
-                      <th className="text-left py-4 px-4 font-bold text-primary">
+                      <th className="text-left py-4 px-4 font-bold text-primary dark:text-secondary">
                         Group
                       </th>
-                      <th className="text-left py-4 px-4 font-bold text-primary">
+                      <th className="text-left py-4 px-4 font-bold text-primary dark:text-secondary">
                         Base Price
                       </th>
-                      <th className="text-left py-4 px-4 font-bold text-primary">
+                      <th className="text-left py-4 px-4 font-bold text-primary dark:text-secondary">
                         Status
                       </th>
-                      <th className="text-center py-4 px-4 font-bold text-primary">
+                      <th className="text-center py-4 px-4 font-bold text-primary dark:text-secondary">
                         Actions
                       </th>
                     </tr>
@@ -731,15 +731,15 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
                       return (
                         <tr
                           key={player.id}
-                          className={`border-b border-border hover:bg-gray-50 transition ${
+                          className={`border-b border-border dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition ${
                             player.soldTo
-                              ? "bg-green-50/50"
+                              ? "bg-green-50/50 dark:bg-green-900/20"
                               : player.unsold
-                                ? "bg-red-50/50"
+                                ? "bg-red-50/50 dark:bg-red-900/20"
                                 : ""
                           }`}
                         >
-                          <td className="py-4 px-4 text-textLight">
+                          <td className="py-4 px-4 text-textLight dark:text-gray-400">
                             {idx + 1}
                           </td>
                           <td className="py-4 px-4">
@@ -757,12 +757,12 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
                                   }}
                                 />
                               )}
-                              <span className="font-bold text-text">
+                              <span className="font-bold text-text dark:text-white">
                                 {player.player_name}
                               </span>
                             </div>
                           </td>
-                          <td className="py-4 px-4 text-text">{player.age}</td>
+                          <td className="py-4 px-4 text-text dark:text-gray-300">{player.age}</td>
                           <td className="py-4 px-4">
                             <span className="bg-secondary text-primary px-3 py-1 rounded-full text-sm font-bold">
                               {group?.group_name || "N/A"}
@@ -773,7 +773,7 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
                               </span>
                             )}
                           </td>
-                          <td className="py-4 px-4 text-text font-semibold">
+                          <td className="py-4 px-4 text-text dark:text-gray-300 font-semibold">
                             ₹{(group?.base_price || 0).toLocaleString()}
                           </td>
                           <td className="py-4 px-4">

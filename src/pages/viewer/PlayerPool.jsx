@@ -47,6 +47,12 @@ export const PlayerPool = () => {
 
   // Filter players
   const filteredPlayers = useMemo(() => {
+    const getPlayerStatus = (player) => {
+      if (player.soldTo) return "sold";
+      if (player.unsold) return "unsold";
+      return "pending";
+    };
+
     return playersList.filter((player) => {
       // Search filter
       if (
@@ -65,8 +71,9 @@ export const PlayerPool = () => {
       }
 
       // Status filter
-      if (statusFilter === "sold" && !player.soldTo) return false;
-      if (statusFilter === "unsold" && player.soldTo) return false;
+      if (statusFilter !== "all" && getPlayerStatus(player) !== statusFilter) {
+        return false;
+      }
 
       return true;
     });
@@ -75,11 +82,12 @@ export const PlayerPool = () => {
   // Stats
   const totalPlayers = playersList.length;
   const soldCount = playersList.filter((p) => p.soldTo).length;
-  const unsoldCount = totalPlayers - soldCount;
+  const unsoldCount = playersList.filter((p) => p.unsold && !p.soldTo).length;
+  const pendingCount = totalPlayers - soldCount - unsoldCount;
 
   if (auctionLoading) {
     return (
-      <div className="min-h-screen bg-lightBg p-3 sm:p-4">
+      <div className="min-h-screen bg-lightBg dark:bg-gray-900 p-3 sm:p-4 transition-colors">
         <div className="max-w-7xl mx-auto">
           <div className="mb-6">
             <div className="skeleton h-6 w-32 mb-3"></div>
@@ -98,7 +106,7 @@ export const PlayerPool = () => {
             {[...Array(6)].map((_, i) => (
               <div
                 key={i}
-                className="rounded-lg overflow-hidden bg-white shadow-lg"
+                className="rounded-lg overflow-hidden bg-white dark:bg-gray-800 shadow-lg"
               >
                 <div className="skeleton h-28 sm:h-40 w-full rounded-none"></div>
                 <div className="p-3 space-y-2">
@@ -116,12 +124,12 @@ export const PlayerPool = () => {
 
   if (!auctionData || auctionError) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-lightBg">
+      <div className="min-h-screen flex items-center justify-center bg-lightBg dark:bg-gray-900 transition-colors">
         <div className="text-center">
-          <p className="text-2xl font-bold text-primary mb-2">
+          <p className="text-2xl font-bold text-primary dark:text-secondary mb-2">
             Auction Not Found
           </p>
-          <p className="text-textLight mb-6">
+          <p className="text-textLight dark:text-gray-400 mb-6">
             {auctionError ||
               "This auction does not exist or may have been deleted."}
           </p>
@@ -134,20 +142,20 @@ export const PlayerPool = () => {
   }
 
   return (
-    <div className="min-h-screen bg-lightBg p-3 sm:p-4">
+    <div className="min-h-screen bg-lightBg dark:bg-gray-900 p-3 sm:p-4 transition-colors">
       <div className="max-w-7xl mx-auto page-enter">
         {/* Header */}
         <div className="mb-4 sm:mb-6">
           <Link
             to={ROUTES.AUCTION_DASHBOARD(auctionId)}
-            className="inline-flex items-center gap-2 text-primary hover:text-accent mb-3"
+            className="inline-flex items-center gap-2 text-primary dark:text-secondary hover:text-accent dark:hover:text-yellow-400 mb-3"
           >
             <IoArrowBack size={20} /> Back to Dashboard
           </Link>
-          <h1 className="text-2xl sm:text-4xl font-bold text-primary mb-1">
+          <h1 className="text-2xl sm:text-4xl font-bold text-primary dark:text-secondary mb-1">
             {auctionData?.name} - Player Pool
           </h1>
-          <p className="text-textLight text-sm">
+          <p className="text-textLight dark:text-gray-400 text-sm">
             Browse and filter all {totalPlayers} players
           </p>
         </div>
@@ -237,6 +245,7 @@ export const PlayerPool = () => {
                 className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary"
               >
                 <option value="all">All Status</option>
+                <option value="pending">Pending</option>
                 <option value="sold">Sold</option>
                 <option value="unsold">Unsold</option>
               </select>
@@ -249,6 +258,10 @@ export const PlayerPool = () => {
               {searchTerm && ` (search: "${searchTerm}")`}
               {selectedGroup !== "all" &&
                 ` (group: ${groupsById.get(String(selectedGroup))?.group_name})`}
+              {statusFilter !== "all" && ` (status: ${statusFilter})`}
+            </p>
+            <p className="text-xs text-textLight mt-1">
+              Pending: {pendingCount} | Sold: {soldCount} | Unsold: {unsoldCount}
             </p>
           </div>
         </div>

@@ -275,6 +275,60 @@ export const useAuction = () => {
     }
   }, []);
 
+  // Save auction configuration (group rules, totals, etc.)
+  const saveAuctionConfig = useCallback(async (auctionId, groups) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Build groupRules from groups array
+      const groupRules = {};
+      groups.forEach((group, index) => {
+        const groupName = group.group_name;
+        groupRules[groupName] = {
+          basePrice: parseInt(group.base_price) || 0,
+          minPerTeam: parseInt(group.min_per_team) || 1,
+          maxPerTeam: parseInt(group.max_per_team) || 1,
+          order: group.order || index + 1,
+          incrementValue: parseInt(group.increment_value) || 10,
+          maxBidCap: parseInt(group.max_bid_cap) || 0,
+        };
+      });
+
+      // Calculate totals
+      const totalPlayersPerTeam = Object.values(groupRules).reduce(
+        (sum, rule) => sum + rule.maxPerTeam,
+        0,
+      );
+      const totalMinReserve = Object.values(groupRules).reduce(
+        (sum, rule) => sum + rule.basePrice * rule.minPerTeam,
+        0,
+      );
+
+      // Group order for sequential mode
+      const groupOrder = Object.entries(groupRules)
+        .sort(([, a], [, b]) => a.order - b.order)
+        .map(([name]) => name);
+
+      const config = {
+        groupRules,
+        totalPlayersPerTeam,
+        totalMinReserve,
+        groupOrder,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const configRef = ref(db, `auctions/${auctionId}/config`);
+      await set(configRef, config);
+      return config;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   return {
     auctions,
     loading,
@@ -293,5 +347,6 @@ export const useAuction = () => {
     deleteGroup,
     updateTeam,
     deleteTeam,
+    saveAuctionConfig,
   };
 };

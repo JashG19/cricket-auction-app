@@ -100,20 +100,20 @@ export const TeamDetails = () => {
   }
 
   return (
-    <div className="min-h-screen bg-lightBg p-3 sm:p-4">
+    <div className="min-h-screen bg-lightBg dark:bg-gray-900 p-3 sm:p-4 transition-colors">
       <div className="max-w-7xl mx-auto page-enter">
         {/* Header */}
         <div className="mb-4 sm:mb-6">
           <Link
             to={ROUTES.AUCTION_DASHBOARD(auctionId)}
-            className="inline-flex items-center gap-2 text-primary hover:text-accent mb-3"
+            className="inline-flex items-center gap-2 text-primary dark:text-secondary hover:text-accent dark:hover:text-yellow-400 mb-3"
           >
             <IoArrowBack size={20} /> Back to Dashboard
           </Link>
-          <h1 className="text-2xl sm:text-4xl font-bold text-primary mb-1">
+          <h1 className="text-2xl sm:text-4xl font-bold text-primary dark:text-secondary mb-1">
             {auctionData?.name} - Team Details
           </h1>
-          <p className="text-textLight text-sm">
+          <p className="text-textLight dark:text-gray-400 text-sm">
             Detailed squad information for all teams
           </p>
         </div>
@@ -131,29 +131,29 @@ export const TeamDetails = () => {
             return (
               <div key={team.id} className="card card-hover">
                 {/* Team Header */}
-                <div className="border-b border-border pb-4 sm:pb-6 mb-4 sm:mb-6">
+                <div className="border-b border-border dark:border-gray-700 pb-4 sm:pb-6 mb-4 sm:mb-6">
                   <div className="flex justify-between items-start gap-4 mb-4">
                     <div className="flex items-start gap-4 min-w-0">
                       {team.team_logo && (
                         <img
                           src={getImagePath("team-logo", team.team_logo)}
                           alt={team.team_name}
-                          className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded border border-border flex-shrink-0"
+                          className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded border border-border dark:border-gray-600 flex-shrink-0"
                           onError={(e) => {
                             e.target.style.display = "none";
                           }}
                         />
                       )}
                       <div className="min-w-0">
-                        <h2 className="text-xl sm:text-3xl font-bold text-primary mb-1 sm:mb-2 truncate">
+                        <h2 className="text-xl sm:text-3xl font-bold text-primary dark:text-secondary mb-1 sm:mb-2 truncate">
                           #{idx + 1} {team.team_name}
                         </h2>
-                        <p className="text-sm sm:text-lg text-textLight">
+                        <p className="text-sm sm:text-lg text-textLight dark:text-gray-400">
                           Owner: {team.owner_name}
                         </p>
                       </div>
                     </div>
-                    <span className="bg-primary text-white text-xl sm:text-3xl px-3 sm:px-4 py-1 sm:py-2 rounded-lg font-bold flex-shrink-0">
+                    <span className="bg-primary dark:bg-secondary text-white dark:text-primary text-xl sm:text-3xl px-3 sm:px-4 py-1 sm:py-2 rounded-lg font-bold flex-shrink-0">
                       {squad.length}
                     </span>
                   </div>
@@ -161,10 +161,10 @@ export const TeamDetails = () => {
                   {/* Budget Info */}
                   <div className="grid grid-cols-3 gap-3 sm:gap-4">
                     <div>
-                      <p className="text-textLight text-xs sm:text-sm mb-1">
+                      <p className="text-textLight dark:text-gray-400 text-xs sm:text-sm mb-1">
                         Total Budget
                       </p>
-                      <p className="text-lg sm:text-2xl font-bold text-text">
+                      <p className="text-lg sm:text-2xl font-bold text-text dark:text-white">
                         ₹{budgetTotal.toLocaleString()}
                       </p>
                     </div>

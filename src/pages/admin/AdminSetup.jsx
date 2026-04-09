@@ -17,6 +17,7 @@ import {
 } from "../../utils/dataTransformUtils";
 import { ROUTES } from "../../constants/routes";
 import { QRCodeSVG } from "qrcode.react";
+import { useAuctionTemplate } from "../../hooks/useAuctionTemplate";
 import {
   IoAdd,
   IoTrash,
@@ -29,6 +30,9 @@ import {
   IoShareSocial,
   IoCopy,
   IoSettings,
+  IoSave,
+  IoDocumentText,
+  IoDownload,
 } from "react-icons/io5";
 
 export const AdminSetup = () => {
@@ -43,13 +47,15 @@ export const AdminSetup = () => {
     updateTeam,
     deleteTeam,
     updateAuction,
+    saveAuctionConfig,
   } = useAuction();
   const { toasts, showToast, removeToast } = useToast();
   const [showCreateNew, setShowCreateNew] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [managingGroupsAuctionId, setManagingGroupsAuctionId] = useState(null);
   const [managingTeamsAuctionId, setManagingTeamsAuctionId] = useState(null);
-  const [managingSettingsAuctionId, setManagingSettingsAuctionId] = useState(null);
+  const [managingSettingsAuctionId, setManagingSettingsAuctionId] =
+    useState(null);
   const [showExistingGroupModal, setShowExistingGroupModal] = useState(false);
   const [showExistingTeamModal, setShowExistingTeamModal] = useState(false);
   const [editingExistingGroup, setEditingExistingGroup] = useState(null);
@@ -60,6 +66,8 @@ export const AdminSetup = () => {
     base_price: "",
     increment_value: "",
     max_bid_cap: "",
+    min_per_team: "1",
+    max_per_team: "",
   });
   const [existingTeamForm, setExistingTeamForm] = useState({
     team_name: "",
@@ -78,6 +86,22 @@ export const AdminSetup = () => {
       ),
     [auctionsData],
   );
+
+  // Template functionality
+  const {
+    saveTemplate,
+    loadTemplate,
+    listTemplates,
+    deleteTemplate,
+    applyTemplate,
+    loading: templateLoading,
+  } = useAuctionTemplate();
+  const [templates, setTemplates] = useState([]);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [templateDescription, setTemplateDescription] = useState("");
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
 
   // Auction state
   const [auctionData, setAuctionData] = useState({
@@ -110,6 +134,7 @@ export const AdminSetup = () => {
     base_price: "",
     increment_value: "",
     max_bid_cap: "",
+    min_per_team: "1",
     max_per_team: "",
   });
 
@@ -144,11 +169,17 @@ export const AdminSetup = () => {
           ),
         ),
         Promise.all(
-          groups.map(({ id, ...groupDataWithoutId }) =>
-            addGroup(auctionId, groupDataWithoutId),
+          groups.map(({ id, ...groupDataWithoutId }, index) =>
+            addGroup(auctionId, {
+              ...groupDataWithoutId,
+              order: groupDataWithoutId.order || index + 1,
+            }),
           ),
         ),
       ]);
+
+      // Save auction configuration (group rules, totals)
+      await saveAuctionConfig(auctionId, groups);
 
       showToast("Auction created successfully!", "success");
       navigate(ROUTES.ADMIN_PLAYERS(auctionId));
@@ -201,10 +232,16 @@ export const AdminSetup = () => {
       return;
     }
 
+    // Auto-assign order based on current groups count
+    const order = groups.length + 1;
+
     setGroups([
       ...groups,
       {
         ...groupForm,
+        min_per_team: parseInt(groupForm.min_per_team) || 1,
+        max_per_team: parseInt(groupForm.max_per_team) || 1,
+        order,
         id: `local_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       },
     ]);
@@ -213,6 +250,7 @@ export const AdminSetup = () => {
       base_price: "",
       increment_value: "",
       max_bid_cap: "",
+      min_per_team: "1",
       max_per_team: "",
     });
     setShowGroupModal(false);
@@ -229,6 +267,91 @@ export const AdminSetup = () => {
   const removeGroup = (id) => {
     setGroups(groups.filter((g) => g.id !== id));
     showToast("Group removed", "success");
+  };
+
+  // Load available templates
+  const handleLoadTemplates = async () => {
+    try {
+      setLoadingTemplates(true);
+      const templateList = await listTemplates();
+      setTemplates(templateList);
+      setShowTemplateModal(true);
+    } catch (error) {
+      showToast("Failed to load templates: " + error.message, "error");
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
+
+  // Apply a template to the form
+  const handleApplyTemplate = async (templateId) => {
+    try {
+      const template = await loadTemplate(templateId);
+      const {
+        auctionData: newAuctionData,
+        teams: newTeams,
+        groups: newGroups,
+      } = applyTemplate(template);
+
+      // Keep the current name and date, apply other settings
+      setAuctionData({
+        ...auctionData,
+        purseSize: newAuctionData.purseSize,
+        maxPlayers: newAuctionData.maxPlayers,
+        maxPlayersPerTeam: newAuctionData.maxPlayersPerTeam,
+        auctionMode: newAuctionData.auctionMode,
+      });
+      setTeams(newTeams);
+      setGroups(newGroups);
+      setShowTemplateModal(false);
+      showToast(`Template "${template.template_name}" applied!`, "success");
+    } catch (error) {
+      showToast("Failed to apply template: " + error.message, "error");
+    }
+  };
+
+  // Save current configuration as a template
+  const handleSaveAsTemplate = async () => {
+    if (!templateName.trim()) {
+      showToast("Please enter a template name", "error");
+      return;
+    }
+    if (teams.length === 0 && groups.length === 0) {
+      showToast("Add at least one team or group to save as template", "error");
+      return;
+    }
+
+    try {
+      await saveTemplate(
+        templateName.trim(),
+        templateDescription.trim(),
+        {
+          purse_size: auctionData.purseSize,
+          total_players: auctionData.maxPlayers,
+          max_players_per_team: auctionData.maxPlayersPerTeam,
+          auction_mode: auctionData.auctionMode,
+        },
+        teams,
+        groups,
+      );
+      setShowSaveTemplateModal(false);
+      setTemplateName("");
+      setTemplateDescription("");
+      showToast("Template saved successfully!", "success");
+    } catch (error) {
+      showToast("Failed to save template: " + error.message, "error");
+    }
+  };
+
+  // Delete a template
+  const handleDeleteTemplate = async (templateId) => {
+    try {
+      await deleteTemplate(templateId);
+      setTemplates(templates.filter((t) => t.id !== templateId));
+      showToast("Template deleted", "success");
+    } catch (error) {
+      showToast("Failed to delete template: " + error.message, "error");
+    }
   };
 
   // Fetch groups for the auction being managed
@@ -286,6 +409,7 @@ export const AdminSetup = () => {
             base_price: group.base_price || "",
             increment_value: group.increment_value || "",
             max_bid_cap: group.max_bid_cap || "",
+            min_per_team: group.min_per_team || "1",
             max_per_team: group.max_per_team || "",
           }
         : {
@@ -293,6 +417,7 @@ export const AdminSetup = () => {
             base_price: "",
             increment_value: "",
             max_bid_cap: "",
+            min_per_team: "1",
             max_per_team: "",
           },
     );
@@ -410,43 +535,70 @@ export const AdminSetup = () => {
   const handleUpdateAuctionMode = async (auctionId, newMode) => {
     try {
       await updateAuction(auctionId, { auction_mode: newMode });
-      showToast(`Auction mode updated to ${newMode === "open_after_aplus" ? "Open After A+" : "Sequential Groups"}`, "success");
+      showToast(
+        `Auction mode updated to ${newMode === "open_after_aplus" ? "Open After A+" : "Sequential Groups"}`,
+        "success",
+      );
     } catch (error) {
       showToast("Error updating auction mode: " + error.message, "error");
     }
   };
 
   return (
-    <div className="min-h-screen bg-lightBg">
+    <div className="min-h-screen bg-lightBg dark:bg-gray-900 transition-colors duration-300">
       {/* Header */}
       <Header showBranding={true} />
 
       <div className="p-3 sm:p-6">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
-          <h1 className="text-2xl sm:text-4xl font-bold text-primary mb-2">
+          <h1 className="text-2xl sm:text-4xl font-bold text-primary dark:text-secondary mb-2">
             Admin Dashboard
           </h1>
-          <p className="text-textLight mb-8">Manage your cricket auctions</p>
+          <p className="text-textLight dark:text-gray-400 mb-8">
+            Manage your cricket auctions
+          </p>
+
+          {/* Template Manager Section */}
+          <div className="mb-8">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+              <h2 className="text-2xl font-bold text-primary dark:text-secondary">
+                Saved Templates
+              </h2>
+              <button
+                onClick={handleLoadTemplates}
+                disabled={loadingTemplates}
+                className="btn btn-secondary flex items-center gap-2 justify-center w-full sm:w-auto"
+              >
+                <IoDocumentText size={18} />
+                {loadingTemplates ? "Loading..." : "Manage Templates"}
+              </button>
+            </div>
+            <div className="card p-4 text-center text-textLight dark:text-gray-400">
+              <p className="text-sm">
+                Save your auction configurations as reusable templates to quickly set up new auctions with the same teams and groups structure.
+              </p>
+            </div>
+          </div>
 
           {/* Existing Auctions */}
           {existingAuctions.length > 0 && (
             <div className="mb-8">
-              <h2 className="text-2xl font-bold text-primary mb-4">
+              <h2 className="text-2xl font-bold text-primary dark:text-secondary mb-4">
                 Your Auctions ({existingAuctions.length})
               </h2>
               <div className="grid md:grid-cols-2 gap-4">
                 {existingAuctions.map((auction) => (
                   <div
                     key={auction.id}
-                    className="card card-hover border-2 border-border hover:border-primary transition"
+                    className="card card-hover border-2 border-border dark:border-gray-700 hover:border-primary dark:hover:border-secondary transition"
                   >
                     <div className="flex justify-between items-start gap-2 mb-4">
                       <div className="min-w-0">
-                        <h3 className="text-lg sm:text-xl font-bold text-primary truncate">
+                        <h3 className="text-lg sm:text-xl font-bold text-primary dark:text-white truncate">
                           {auction.name}
                         </h3>
-                        <p className="text-sm text-textLight">
+                        <p className="text-sm text-textLight dark:text-gray-400">
                           {auction.date
                             ? new Date(auction.date).toLocaleDateString()
                             : "No date"}{" "}
@@ -460,7 +612,7 @@ export const AdminSetup = () => {
                               ? "bg-success text-white"
                               : auction.status === "completed"
                                 ? "bg-secondary text-primary"
-                                : "bg-gray-200 text-textLight"
+                                : "bg-gray-200 dark:bg-gray-700 text-textLight dark:text-gray-300"
                           }`}
                         >
                           {auction.status || "setup"}
@@ -585,63 +737,97 @@ export const AdminSetup = () => {
                               Auction Mode
                             </label>
                             <div className="flex flex-col sm:flex-row gap-3">
-                              <label className={`flex-1 cursor-pointer p-3 rounded-lg border-2 transition-all ${
-                                (auction.auction_mode || "open_after_aplus") === "open_after_aplus" 
-                                  ? "border-primary bg-primary/10" 
-                                  : "border-border hover:border-primary/50"
-                              }`}>
+                              <label
+                                className={`flex-1 cursor-pointer p-3 rounded-lg border-2 transition-all ${
+                                  (auction.auction_mode ||
+                                    "open_after_aplus") === "open_after_aplus"
+                                    ? "border-primary bg-primary/10"
+                                    : "border-border hover:border-primary/50"
+                                }`}
+                              >
                                 <input
                                   type="radio"
                                   name={`auctionMode-${auction.id}`}
                                   value="open_after_aplus"
-                                  checked={(auction.auction_mode || "open_after_aplus") === "open_after_aplus"}
-                                  onChange={() => handleUpdateAuctionMode(auction.id, "open_after_aplus")}
+                                  checked={
+                                    (auction.auction_mode ||
+                                      "open_after_aplus") === "open_after_aplus"
+                                  }
+                                  onChange={() =>
+                                    handleUpdateAuctionMode(
+                                      auction.id,
+                                      "open_after_aplus",
+                                    )
+                                  }
                                   className="sr-only"
                                 />
                                 <div className="flex items-center gap-2">
-                                  <div className={`w-3 h-3 rounded-full border-2 flex items-center justify-center ${
-                                    (auction.auction_mode || "open_after_aplus") === "open_after_aplus" 
-                                      ? "border-primary" 
-                                      : "border-textLight"
-                                  }`}>
-                                    {(auction.auction_mode || "open_after_aplus") === "open_after_aplus" && (
-                                      <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
+                                  <div
+                                    className={`w-3 h-3 rounded-full border-2 flex items-center justify-center ${
+                                      (auction.auction_mode ||
+                                        "open_after_aplus") ===
+                                      "open_after_aplus"
+                                        ? "border-primary dark:border-secondary"
+                                        : "border-textLight dark:border-gray-500"
+                                    }`}
+                                  >
+                                    {(auction.auction_mode ||
+                                      "open_after_aplus") ===
+                                      "open_after_aplus" && (
+                                      <div className="w-1.5 h-1.5 rounded-full bg-primary dark:bg-secondary"></div>
                                     )}
                                   </div>
-                                  <span className="font-semibold text-text text-sm">Open After A+</span>
+                                  <span className="font-semibold text-text dark:text-white text-sm">
+                                    Open After A+
+                                  </span>
                                 </div>
-                                <p className="text-xs text-textLight ml-5 mt-1">
-                                  A+ sequential → then random from remaining groups
+                                <p className="text-xs text-textLight dark:text-gray-400 ml-5 mt-1">
+                                  A+ sequential → then random from remaining
+                                  groups
                                 </p>
                               </label>
 
-                              <label className={`flex-1 cursor-pointer p-3 rounded-lg border-2 transition-all ${
-                                auction.auction_mode === "sequential" 
-                                  ? "border-primary bg-primary/10" 
-                                  : "border-border hover:border-primary/50"
-                              }`}>
+                              <label
+                                className={`flex-1 cursor-pointer p-3 rounded-lg border-2 transition-all ${
+                                  auction.auction_mode === "sequential"
+                                    ? "border-primary dark:border-secondary bg-primary/10 dark:bg-secondary/10"
+                                    : "border-border dark:border-gray-600 hover:border-primary/50 dark:hover:border-secondary/50"
+                                }`}
+                              >
                                 <input
                                   type="radio"
                                   name={`auctionMode-${auction.id}`}
                                   value="sequential"
-                                  checked={auction.auction_mode === "sequential"}
-                                  onChange={() => handleUpdateAuctionMode(auction.id, "sequential")}
+                                  checked={
+                                    auction.auction_mode === "sequential"
+                                  }
+                                  onChange={() =>
+                                    handleUpdateAuctionMode(
+                                      auction.id,
+                                      "sequential",
+                                    )
+                                  }
                                   className="sr-only"
                                 />
                                 <div className="flex items-center gap-2">
-                                  <div className={`w-3 h-3 rounded-full border-2 flex items-center justify-center ${
-                                    auction.auction_mode === "sequential" 
-                                      ? "border-primary" 
-                                      : "border-textLight"
-                                  }`}>
+                                  <div
+                                    className={`w-3 h-3 rounded-full border-2 flex items-center justify-center ${
+                                      auction.auction_mode === "sequential"
+                                        ? "border-primary dark:border-secondary"
+                                        : "border-textLight dark:border-gray-500"
+                                    }`}
+                                  >
                                     {auction.auction_mode === "sequential" && (
-                                      <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
+                                      <div className="w-1.5 h-1.5 rounded-full bg-primary dark:bg-secondary"></div>
                                     )}
                                   </div>
-                                  <span className="font-semibold text-text text-sm">Sequential Groups</span>
+                                  <span className="font-semibold text-text dark:text-white text-sm">
+                                    Sequential Groups
+                                  </span>
                                 </div>
-                                <p className="text-xs text-textLight ml-5 mt-1">
-                                  Groups one after another (A+ → A → B+ → B → C → D → X)
+                                <p className="text-xs text-textLight dark:text-gray-400 ml-5 mt-1">
+                                  Groups one after another (A+ → A → B+ → B → C
+                                  → D → X)
                                 </p>
                               </label>
                             </div>
@@ -650,9 +836,9 @@ export const AdminSetup = () => {
                       </div>
                     )}
                     {managingTeamsAuctionId === auction.id && (
-                      <div className="mt-4 pt-4 border-t border-border">
+                      <div className="mt-4 pt-4 border-t border-border dark:border-gray-700">
                         <div className="flex justify-between items-center mb-3">
-                          <h4 className="font-bold text-text">
+                          <h4 className="font-bold text-text dark:text-white">
                             Teams ({managedTeamsList.length})
                           </h4>
                           <button
@@ -664,7 +850,7 @@ export const AdminSetup = () => {
                         </div>
 
                         {managedTeamsList.length === 0 ? (
-                          <p className="text-textLight text-sm py-2">
+                          <p className="text-textLight dark:text-gray-400 text-sm py-2">
                             No teams yet
                           </p>
                         ) : (
@@ -672,7 +858,7 @@ export const AdminSetup = () => {
                             {managedTeamsList.map((team) => (
                               <div
                                 key={team.id}
-                                className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-3 bg-lightBg border border-border rounded-lg"
+                                className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-3 bg-lightBg dark:bg-gray-700 border border-border dark:border-gray-600 rounded-lg"
                               >
                                 <div className="flex items-center gap-3 min-w-0">
                                   {team.team_logo && (
@@ -682,17 +868,17 @@ export const AdminSetup = () => {
                                         team.team_logo,
                                       )}
                                       alt={team.team_name}
-                                      className="w-10 h-10 object-contain rounded border border-border flex-shrink-0"
+                                      className="w-10 h-10 object-contain rounded border border-border dark:border-gray-600 flex-shrink-0"
                                       onError={(e) => {
                                         e.target.style.display = "none";
                                       }}
                                     />
                                   )}
                                   <div className="min-w-0">
-                                    <p className="font-semibold text-text text-sm">
+                                    <p className="font-semibold text-text dark:text-white text-sm">
                                       {team.team_name}
                                     </p>
-                                    <p className="text-xs text-textLight break-words">
+                                    <p className="text-xs text-textLight dark:text-gray-400 break-words">
                                       Owner: {team.owner_name} | Budget: ₹
                                       {(
                                         team.budget_total || 0
@@ -730,9 +916,9 @@ export const AdminSetup = () => {
 
                     {/* Inline Groups Management */}
                     {managingGroupsAuctionId === auction.id && (
-                      <div className="mt-4 pt-4 border-t border-border">
+                      <div className="mt-4 pt-4 border-t border-border dark:border-gray-700">
                         <div className="flex justify-between items-center mb-3">
-                          <h4 className="font-bold text-text">
+                          <h4 className="font-bold text-text dark:text-white">
                             Player Groups ({managedGroupsList.length})
                           </h4>
                           <button
@@ -744,7 +930,7 @@ export const AdminSetup = () => {
                         </div>
 
                         {managedGroupsList.length === 0 ? (
-                          <p className="text-textLight text-sm py-2">
+                          <p className="text-textLight dark:text-gray-400 text-sm py-2">
                             No groups yet
                           </p>
                         ) : (
@@ -752,13 +938,13 @@ export const AdminSetup = () => {
                             {managedGroupsList.map((group) => (
                               <div
                                 key={group.id}
-                                className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-3 bg-lightBg border border-border rounded-lg"
+                                className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-3 bg-lightBg dark:bg-gray-700 border border-border dark:border-gray-600 rounded-lg"
                               >
                                 <div className="min-w-0">
-                                  <p className="font-semibold text-text text-sm">
+                                  <p className="font-semibold text-text dark:text-white text-sm">
                                     {group.group_name}
                                   </p>
-                                  <p className="text-xs text-textLight break-words">
+                                  <p className="text-xs text-textLight dark:text-gray-400 break-words">
                                     Base: ₹
                                     {(group.base_price || 0).toLocaleString()} |
                                     Inc: ₹
@@ -820,27 +1006,50 @@ export const AdminSetup = () => {
           ) : (
             <>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-primary">
+                <h2 className="text-2xl font-bold text-primary dark:text-secondary">
                   Create New Auction
                 </h2>
                 {existingAuctions.length > 0 && (
                   <button
                     onClick={() => setShowCreateNew(false)}
-                    className="text-textLight hover:text-primary text-sm font-semibold"
+                    className="text-textLight dark:text-gray-400 hover:text-primary dark:hover:text-secondary text-sm font-semibold"
                   >
                     Cancel
                   </button>
                 )}
               </div>
 
+              {/* Template Quick Start */}
+              <div className="card mb-8 bg-gradient-to-r from-primary/10 to-accent/10 dark:from-gray-800 dark:to-gray-700 border-2 border-primary/20 dark:border-secondary/20">
+                <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-primary dark:text-secondary mb-1">
+                      Quick Start with Templates
+                    </h3>
+                    <p className="text-sm text-textLight dark:text-gray-400">
+                      Load a saved template to auto-fill groups & teams
+                      configuration
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleLoadTemplates}
+                    disabled={loadingTemplates}
+                    className="btn btn-secondary flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <IoDownload size={18} />
+                    {loadingTemplates ? "Loading..." : "Use Template"}
+                  </button>
+                </div>
+              </div>
+
               {/* Auction Details */}
               <div className="card mb-8">
-                <h2 className="text-2xl font-bold text-primary mb-6">
+                <h2 className="text-2xl font-bold text-primary dark:text-secondary mb-6">
                   Auction Details
                 </h2>
                 <div className="grid md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block font-semibold text-text mb-2">
+                    <label className="block font-semibold text-text dark:text-white mb-2">
                       Auction Name
                     </label>
                     <input
@@ -925,16 +1134,20 @@ export const AdminSetup = () => {
                       Auction Mode
                     </label>
                     <div className="flex flex-col sm:flex-row gap-4">
-                      <label className={`flex-1 cursor-pointer p-4 rounded-lg border-2 transition-all ${
-                        auctionData.auctionMode === "open_after_aplus" 
-                          ? "border-primary bg-primary/10" 
-                          : "border-border hover:border-primary/50"
-                      }`}>
+                      <label
+                        className={`flex-1 cursor-pointer p-4 rounded-lg border-2 transition-all ${
+                          auctionData.auctionMode === "open_after_aplus"
+                            ? "border-primary bg-primary/10"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                      >
                         <input
                           type="radio"
                           name="auctionMode"
                           value="open_after_aplus"
-                          checked={auctionData.auctionMode === "open_after_aplus"}
+                          checked={
+                            auctionData.auctionMode === "open_after_aplus"
+                          }
                           onChange={(e) =>
                             setAuctionData({
                               ...auctionData,
@@ -944,28 +1157,35 @@ export const AdminSetup = () => {
                           className="sr-only"
                         />
                         <div className="flex items-center gap-2 mb-1">
-                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                            auctionData.auctionMode === "open_after_aplus" 
-                              ? "border-primary" 
-                              : "border-textLight"
-                          }`}>
+                          <div
+                            className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                              auctionData.auctionMode === "open_after_aplus"
+                                ? "border-primary"
+                                : "border-textLight"
+                            }`}
+                          >
                             {auctionData.auctionMode === "open_after_aplus" && (
                               <div className="w-2 h-2 rounded-full bg-primary"></div>
                             )}
                           </div>
-                          <span className="font-semibold text-text">Open After A+</span>
+                          <span className="font-semibold text-text">
+                            Open After A+
+                          </span>
                         </div>
                         <p className="text-sm text-textLight ml-6">
-                          A+ players are auctioned first sequentially. After all A+ are sold, 
-                          players from remaining groups are selected randomly.
+                          A+ players are auctioned first sequentially. After all
+                          A+ are sold, players from remaining groups are
+                          selected randomly.
                         </p>
                       </label>
 
-                      <label className={`flex-1 cursor-pointer p-4 rounded-lg border-2 transition-all ${
-                        auctionData.auctionMode === "sequential" 
-                          ? "border-primary bg-primary/10" 
-                          : "border-border hover:border-primary/50"
-                      }`}>
+                      <label
+                        className={`flex-1 cursor-pointer p-4 rounded-lg border-2 transition-all ${
+                          auctionData.auctionMode === "sequential"
+                            ? "border-primary bg-primary/10"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                      >
                         <input
                           type="radio"
                           name="auctionMode"
@@ -980,20 +1200,24 @@ export const AdminSetup = () => {
                           className="sr-only"
                         />
                         <div className="flex items-center gap-2 mb-1">
-                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                            auctionData.auctionMode === "sequential" 
-                              ? "border-primary" 
-                              : "border-textLight"
-                          }`}>
+                          <div
+                            className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                              auctionData.auctionMode === "sequential"
+                                ? "border-primary"
+                                : "border-textLight"
+                            }`}
+                          >
                             {auctionData.auctionMode === "sequential" && (
                               <div className="w-2 h-2 rounded-full bg-primary"></div>
                             )}
                           </div>
-                          <span className="font-semibold text-text">Sequential Groups</span>
+                          <span className="font-semibold text-text">
+                            Sequential Groups
+                          </span>
                         </div>
                         <p className="text-sm text-textLight ml-6">
-                          Groups are auctioned one after another in order. 
-                          (A+ → A → B+ → B → C → D → X)
+                          Groups are auctioned one after another in order. (A+ →
+                          A → B+ → B → C → D → X)
                         </p>
                       </label>
                     </div>
@@ -1108,20 +1332,26 @@ export const AdminSetup = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-4">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 <button
                   onClick={() =>
                     existingAuctions.length > 0
                       ? setShowCreateNew(false)
                       : navigate(ROUTES.HOME)
                   }
-                  className="btn btn-sm border border-primary text-primary hover:bg-lightBg"
+                  className="btn btn-sm border border-primary text-primary hover:bg-lightBg dark:border-secondary dark:text-secondary"
                 >
                   Back
                 </button>
                 <button
+                  onClick={() => setShowSaveTemplateModal(true)}
+                  className="btn btn-secondary flex items-center gap-2 justify-center"
+                >
+                  <IoSave size={18} /> Save as Template
+                </button>
+                <button
                   onClick={handleCreateAuction}
-                  className="btn btn-primary flex items-center gap-2 btn-lg"
+                  className="btn btn-primary flex items-center gap-2 justify-center btn-lg"
                 >
                   Create & Add Players
                   <IoArrowForward size={20} />
@@ -1309,22 +1539,48 @@ export const AdminSetup = () => {
                 className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary"
               />
             </div>
-            <div>
-              <label className="block font-semibold text-text mb-2">
-                Max Players Per Team From This Group - Optional
-              </label>
-              <input
-                type="number"
-                value={groupForm.max_per_team}
-                onChange={(e) =>
-                  setGroupForm({
-                    ...groupForm,
-                    max_per_team: Number(e.target.value) || "",
-                  })
-                }
-                placeholder="Leave empty for no limit"
-                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block font-semibold text-text mb-2">
+                  Min Players Per Team
+                </label>
+                <input
+                  type="number"
+                  value={groupForm.min_per_team}
+                  onChange={(e) =>
+                    setGroupForm({
+                      ...groupForm,
+                      min_per_team: Number(e.target.value) || "1",
+                    })
+                  }
+                  placeholder="Required minimum"
+                  min="0"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary"
+                />
+                <p className="text-xs text-textLight mt-1">
+                  Required for reserve budget calc
+                </p>
+              </div>
+              <div>
+                <label className="block font-semibold text-text mb-2">
+                  Max Players Per Team
+                </label>
+                <input
+                  type="number"
+                  value={groupForm.max_per_team}
+                  onChange={(e) =>
+                    setGroupForm({
+                      ...groupForm,
+                      max_per_team: Number(e.target.value) || "",
+                    })
+                  }
+                  placeholder="Optional limit"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary"
+                />
+                <p className="text-xs text-textLight mt-1">
+                  Leave empty for no limit
+                </p>
+              </div>
             </div>
           </div>
         </Modal>
@@ -1413,22 +1669,48 @@ export const AdminSetup = () => {
                 className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary"
               />
             </div>
-            <div>
-              <label className="block font-semibold text-text mb-2">
-                Max Players Per Team From This Group - Optional
-              </label>
-              <input
-                type="number"
-                value={existingGroupForm.max_per_team}
-                onChange={(e) =>
-                  setExistingGroupForm({
-                    ...existingGroupForm,
-                    max_per_team: Number(e.target.value) || "",
-                  })
-                }
-                placeholder="Leave empty for no limit"
-                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block font-semibold text-text mb-2">
+                  Min Players Per Team
+                </label>
+                <input
+                  type="number"
+                  value={existingGroupForm.min_per_team}
+                  onChange={(e) =>
+                    setExistingGroupForm({
+                      ...existingGroupForm,
+                      min_per_team: Number(e.target.value) || "1",
+                    })
+                  }
+                  placeholder="Required minimum"
+                  min="0"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary"
+                />
+                <p className="text-xs text-textLight mt-1">
+                  Required for reserve budget calc
+                </p>
+              </div>
+              <div>
+                <label className="block font-semibold text-text mb-2">
+                  Max Players Per Team
+                </label>
+                <input
+                  type="number"
+                  value={existingGroupForm.max_per_team}
+                  onChange={(e) =>
+                    setExistingGroupForm({
+                      ...existingGroupForm,
+                      max_per_team: Number(e.target.value) || "",
+                    })
+                  }
+                  placeholder="Optional limit"
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary"
+                />
+                <p className="text-xs text-textLight mt-1">
+                  Leave empty for no limit
+                </p>
+              </div>
             </div>
           </div>
         </Modal>
@@ -1603,6 +1885,114 @@ export const AdminSetup = () => {
                 </div>
               );
             })()}
+        </Modal>
+
+        {/* Load Template Modal */}
+        <Modal
+          isOpen={showTemplateModal}
+          title="Load Template"
+          onClose={() => setShowTemplateModal(false)}
+          size="large"
+        >
+          <div className="space-y-4">
+            {loadingTemplates ? (
+              <div className="py-8 text-center text-textLight dark:text-gray-400">
+                Loading templates...
+              </div>
+            ) : templates.length === 0 ? (
+              <div className="py-8 text-center text-textLight dark:text-gray-400">
+                No templates saved yet. Create an auction configuration and save
+                it as a template to reuse later.
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {templates.map((template) => (
+                  <div
+                    key={template.id}
+                    className="p-4 border border-border dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-text dark:text-white mb-1">
+                          {template.template_name}
+                        </h3>
+                        <p className="text-sm text-textLight dark:text-gray-400 mb-2">
+                          {template.description}
+                        </p>
+                        <p className="text-xs text-textLight dark:text-gray-500">
+                          Teams: {template.team_template?.length || 0} | Groups:{" "}
+                          {template.group_template?.length || 0} | Mode:{" "}
+                          {template.auction_settings?.auction_mode || "N/A"}
+                        </p>
+                      </div>
+                      <div className="flex gap-2 self-end sm:self-auto">
+                        <button
+                          onClick={() => handleApplyTemplate(template.id)}
+                          className="btn btn-primary btn-sm"
+                        >
+                          Use
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTemplate(template.id)}
+                          className="btn btn-danger btn-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Modal>
+
+        {/* Save as Template Modal */}
+        <Modal
+          isOpen={showSaveTemplateModal}
+          title="Save as Template"
+          onClose={() => {
+            setShowSaveTemplateModal(false);
+            setTemplateName("");
+            setTemplateDescription("");
+          }}
+          onConfirm={handleSaveAsTemplate}
+          confirmText="Save Template"
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block font-semibold text-text dark:text-white mb-2">
+                Template Name *
+              </label>
+              <input
+                type="text"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="e.g., IPL Standard 10-Team"
+                className="w-full px-4 py-2 border border-border dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg focus:outline-none focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold text-text dark:text-white mb-2">
+                Description (Optional)
+              </label>
+              <textarea
+                value={templateDescription}
+                onChange={(e) => setTemplateDescription(e.target.value)}
+                placeholder="Describe this template configuration..."
+                rows="3"
+                className="w-full px-4 py-2 border border-border dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg focus:outline-none focus:border-primary"
+              />
+            </div>
+            <div className="bg-blue-50 dark:bg-gray-800 border border-blue-200 dark:border-gray-700 rounded-lg p-3">
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                <strong>Saved:</strong> {teams.length} teams, {groups.length}{" "}
+                groups
+                <br />
+                <strong>Settings:</strong> ₹{auctionData.purseSize.toLocaleString()} purse, {auctionData.maxPlayers} players
+              </p>
+            </div>
+          </div>
         </Modal>
 
         {/* Toast Notifications */}
