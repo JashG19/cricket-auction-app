@@ -23,13 +23,6 @@ body {
     color 0.3s ease;
 }
 
-/* Dark mode body styles */
-.dark body,
-html.dark body {
-  background-color: #111827;
-  color: #f3f4f6;
-}
-
 #root {
   width: 100%;
   margin: 0 auto;
@@ -109,11 +102,6 @@ html.dark body {
   border-radius: 0.375rem;
 }
 
-.dark .skeleton {
-  background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
-  background-size: 200% 100%;
-}
-
 /* Hide scrollbars globally but allow scrolling */
 * {
   scrollbar-width: none; /* Firefox */
@@ -169,9 +157,6 @@ html.dark body {
   .card {
     @apply bg-white rounded-lg shadow-lg p-6;
   }
-  .dark .card {
-    @apply bg-gray-800 shadow-xl;
-  }
   .card-hover {
     @apply transition-all duration-200;
   }
@@ -181,37 +166,14 @@ html.dark body {
   .table-improved thead th {
     @apply sticky top-0 bg-white z-10 border-b-2 border-border;
   }
-  .dark .table-improved thead th {
-    @apply bg-gray-800 border-gray-600;
-  }
   .table-improved tbody tr:nth-child(even) {
     @apply bg-gray-50;
-  }
-  .dark .table-improved tbody tr:nth-child(even) {
-    @apply bg-gray-700;
   }
   .table-improved tbody tr {
     @apply hover:bg-blue-50 transition-colors;
   }
-  .dark .table-improved tbody tr {
-    @apply hover:bg-gray-600;
-  }
 
-  /* Theme toggle button animation */
-  .theme-toggle {
-    @apply relative p-2 rounded-full transition-all duration-300;
-  }
-  .theme-toggle:hover {
-    @apply scale-110;
-  }
-  .theme-toggle svg {
-    @apply transition-transform duration-300;
-  }
-  .theme-toggle:hover svg {
-    @apply rotate-12;
-  }
-
-  /* Dark mode for form inputs */
+  /* Form inputs */
   input[type="text"],
   input[type="number"],
   input[type="email"],
@@ -220,26 +182,5 @@ html.dark body {
   select,
   textarea {
     @apply transition-colors duration-200;
-  }
-  .dark input[type="text"],
-  .dark input[type="number"],
-  .dark input[type="email"],
-  .dark input[type="password"],
-  .dark input[type="date"],
-  .dark select,
-  .dark textarea {
-    @apply bg-gray-700 border-gray-600 text-white;
-  }
-  .dark input::placeholder,
-  .dark textarea::placeholder {
-    @apply text-gray-400;
-  }
-  .dark select option {
-    @apply bg-gray-700 text-white;
-  }
-
-  /* Dark mode for radio buttons and checkboxes labels */
-  .dark label {
-    @apply text-gray-300;
   }
 }

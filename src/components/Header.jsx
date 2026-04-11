@@ -1,11 +1,8 @@
 import { useAuth } from "../hooks/useAuth";
-import { useTheme } from "../hooks/useTheme";
-import { IoSunny, IoMoon } from "react-icons/io5";
 import pcLogo from "/images/PCL Logo.png";
 
 export const Header = ({ showBranding = true }) => {
   const { user, isAdmin } = useAuth();
-  const { isDark, toggleTheme } = useTheme();
 
   return (
     <nav className="bg-darkBg bg-opacity-95 backdrop-blur-sm p-4 sm:p-5 border-b-2 border-secondary border-opacity-40 shadow-lg">
@@ -31,22 +28,8 @@ export const Header = ({ showBranding = true }) => {
           )}
         </div>
 
-        {/* Right side - Theme Toggle & User Info */}
+        {/* Right side - User Info */}
         <div className="flex items-center gap-3 sm:gap-4">
-          {/* Theme Toggle Button */}
-          <button
-            onClick={toggleTheme}
-            className="theme-toggle bg-gray-700 hover:bg-gray-600 text-yellow-400"
-            title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-            aria-label={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-          >
-            {isDark ? (
-              <IoSunny className="w-5 h-5" />
-            ) : (
-              <IoMoon className="w-5 h-5" />
-            )}
-          </button>
-
           {/* User Info */}
           {user && (
             <>

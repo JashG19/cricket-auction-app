@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "canvas-confetti": "^1.9.4",
+    "choco": "^0.2.1",
     "firebase": "^10.7.2",
     "jspdf": "^4.2.0",
     "jspdf-autotable": "^5.0.7",
@@ -34,7 +35,7 @@
     "jsdom": "^29.0.2",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
-    "vite": "^5.3.4",
+    "vite": "^8.0.8",
     "vitest": "^4.1.3"
   }
 }
