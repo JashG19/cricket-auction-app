@@ -545,24 +545,22 @@ export const AdminSetup = () => {
   };
 
   return (
-    <div className="min-h-screen bg-lightBg dark:bg-gray-900 transition-colors duration-300">
+    <div className="min-h-screen bg-lightBg transition-colors duration-300">
       {/* Header */}
       <Header showBranding={true} />
 
       <div className="p-3 sm:p-6">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
-          <h1 className="text-2xl sm:text-4xl font-bold text-primary dark:text-secondary mb-2">
+          <h1 className="text-2xl sm:text-4xl font-bold text-primary mb-2">
             Admin Dashboard
           </h1>
-          <p className="text-textLight dark:text-gray-400 mb-8">
-            Manage your cricket auctions
-          </p>
+          <p className="text-textLight mb-8">Manage your cricket auctions</p>
 
           {/* Template Manager Section */}
           <div className="mb-8">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
-              <h2 className="text-2xl font-bold text-primary dark:text-secondary">
+              <h2 className="text-2xl font-bold text-primary">
                 Saved Templates
               </h2>
               <button
@@ -574,9 +572,11 @@ export const AdminSetup = () => {
                 {loadingTemplates ? "Loading..." : "Manage Templates"}
               </button>
             </div>
-            <div className="card p-4 text-center text-textLight dark:text-gray-400">
+            <div className="card p-4 text-center text-textLight">
               <p className="text-sm">
-                Save your auction configurations as reusable templates to quickly set up new auctions with the same teams and groups structure.
+                Save your auction configurations as reusable templates to
+                quickly set up new auctions with the same teams and groups
+                structure.
               </p>
             </div>
           </div>
@@ -584,21 +584,21 @@ export const AdminSetup = () => {
           {/* Existing Auctions */}
           {existingAuctions.length > 0 && (
             <div className="mb-8">
-              <h2 className="text-2xl font-bold text-primary dark:text-secondary mb-4">
+              <h2 className="text-2xl font-bold text-primary mb-4">
                 Your Auctions ({existingAuctions.length})
               </h2>
               <div className="grid md:grid-cols-2 gap-4">
                 {existingAuctions.map((auction) => (
                   <div
                     key={auction.id}
-                    className="card card-hover border-2 border-border dark:border-gray-700 hover:border-primary dark:hover:border-secondary transition"
+                    className="card card-hover border-2 border-border hover:border-primary transition"
                   >
                     <div className="flex justify-between items-start gap-2 mb-4">
                       <div className="min-w-0">
-                        <h3 className="text-lg sm:text-xl font-bold text-primary dark:text-white truncate">
+                        <h3 className="text-lg sm:text-xl font-bold text-primary truncate">
                           {auction.name}
                         </h3>
-                        <p className="text-sm text-textLight dark:text-gray-400">
+                        <p className="text-sm text-textLight">
                           {auction.date
                             ? new Date(auction.date).toLocaleDateString()
                             : "No date"}{" "}
@@ -612,7 +612,7 @@ export const AdminSetup = () => {
                               ? "bg-success text-white"
                               : auction.status === "completed"
                                 ? "bg-secondary text-primary"
-                                : "bg-gray-200 dark:bg-gray-700 text-textLight dark:text-gray-300"
+                                : "bg-gray-200 text-textLight"
                           }`}
                         >
                           {auction.status || "setup"}
@@ -767,21 +767,21 @@ export const AdminSetup = () => {
                                       (auction.auction_mode ||
                                         "open_after_aplus") ===
                                       "open_after_aplus"
-                                        ? "border-primary dark:border-secondary"
-                                        : "border-textLight dark:border-gray-500"
+                                        ? "border-primary"
+                                        : "border-textLight"
                                     }`}
                                   >
                                     {(auction.auction_mode ||
                                       "open_after_aplus") ===
                                       "open_after_aplus" && (
-                                      <div className="w-1.5 h-1.5 rounded-full bg-primary dark:bg-secondary"></div>
+                                      <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
                                     )}
                                   </div>
-                                  <span className="font-semibold text-text dark:text-white text-sm">
+                                  <span className="font-semibold text-text text-sm">
                                     Open After A+
                                   </span>
                                 </div>
-                                <p className="text-xs text-textLight dark:text-gray-400 ml-5 mt-1">
+                                <p className="text-xs text-textLight ml-5 mt-1">
                                   A+ sequential → then random from remaining
                                   groups
                                 </p>
@@ -790,8 +790,8 @@ export const AdminSetup = () => {
                               <label
                                 className={`flex-1 cursor-pointer p-3 rounded-lg border-2 transition-all ${
                                   auction.auction_mode === "sequential"
-                                    ? "border-primary dark:border-secondary bg-primary/10 dark:bg-secondary/10"
-                                    : "border-border dark:border-gray-600 hover:border-primary/50 dark:hover:border-secondary/50"
+                                    ? "border-primary bg-primary/10"
+                                    : "border-border hover:border-primary/50"
                                 }`}
                               >
                                 <input
@@ -813,19 +813,19 @@ export const AdminSetup = () => {
                                   <div
                                     className={`w-3 h-3 rounded-full border-2 flex items-center justify-center ${
                                       auction.auction_mode === "sequential"
-                                        ? "border-primary dark:border-secondary"
-                                        : "border-textLight dark:border-gray-500"
+                                        ? "border-primary"
+                                        : "border-textLight"
                                     }`}
                                   >
                                     {auction.auction_mode === "sequential" && (
-                                      <div className="w-1.5 h-1.5 rounded-full bg-primary dark:bg-secondary"></div>
+                                      <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
                                     )}
                                   </div>
-                                  <span className="font-semibold text-text dark:text-white text-sm">
+                                  <span className="font-semibold text-text text-sm">
                                     Sequential Groups
                                   </span>
                                 </div>
-                                <p className="text-xs text-textLight dark:text-gray-400 ml-5 mt-1">
+                                <p className="text-xs text-textLight ml-5 mt-1">
                                   Groups one after another (A+ → A → B+ → B → C
                                   → D → X)
                                 </p>
@@ -836,9 +836,9 @@ export const AdminSetup = () => {
                       </div>
                     )}
                     {managingTeamsAuctionId === auction.id && (
-                      <div className="mt-4 pt-4 border-t border-border dark:border-gray-700">
+                      <div className="mt-4 pt-4 border-t border-border">
                         <div className="flex justify-between items-center mb-3">
-                          <h4 className="font-bold text-text dark:text-white">
+                          <h4 className="font-bold text-text">
                             Teams ({managedTeamsList.length})
                           </h4>
                           <button
@@ -850,7 +850,7 @@ export const AdminSetup = () => {
                         </div>
 
                         {managedTeamsList.length === 0 ? (
-                          <p className="text-textLight dark:text-gray-400 text-sm py-2">
+                          <p className="text-textLight text-sm py-2">
                             No teams yet
                           </p>
                         ) : (
@@ -858,7 +858,7 @@ export const AdminSetup = () => {
                             {managedTeamsList.map((team) => (
                               <div
                                 key={team.id}
-                                className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-3 bg-lightBg dark:bg-gray-700 border border-border dark:border-gray-600 rounded-lg"
+                                className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-3 bg-lightBg border border-border rounded-lg"
                               >
                                 <div className="flex items-center gap-3 min-w-0">
                                   {team.team_logo && (
@@ -868,17 +868,17 @@ export const AdminSetup = () => {
                                         team.team_logo,
                                       )}
                                       alt={team.team_name}
-                                      className="w-10 h-10 object-contain rounded border border-border dark:border-gray-600 flex-shrink-0"
+                                      className="w-10 h-10 object-contain rounded border border-border flex-shrink-0"
                                       onError={(e) => {
                                         e.target.style.display = "none";
                                       }}
                                     />
                                   )}
                                   <div className="min-w-0">
-                                    <p className="font-semibold text-text dark:text-white text-sm">
+                                    <p className="font-semibold text-text text-sm">
                                       {team.team_name}
                                     </p>
-                                    <p className="text-xs text-textLight dark:text-gray-400 break-words">
+                                    <p className="text-xs text-textLight break-words">
                                       Owner: {team.owner_name} | Budget: ₹
                                       {(
                                         team.budget_total || 0
@@ -916,9 +916,9 @@ export const AdminSetup = () => {
 
                     {/* Inline Groups Management */}
                     {managingGroupsAuctionId === auction.id && (
-                      <div className="mt-4 pt-4 border-t border-border dark:border-gray-700">
+                      <div className="mt-4 pt-4 border-t border-border">
                         <div className="flex justify-between items-center mb-3">
-                          <h4 className="font-bold text-text dark:text-white">
+                          <h4 className="font-bold text-text">
                             Player Groups ({managedGroupsList.length})
                           </h4>
                           <button
@@ -930,7 +930,7 @@ export const AdminSetup = () => {
                         </div>
 
                         {managedGroupsList.length === 0 ? (
-                          <p className="text-textLight dark:text-gray-400 text-sm py-2">
+                          <p className="text-textLight text-sm py-2">
                             No groups yet
                           </p>
                         ) : (
@@ -938,13 +938,13 @@ export const AdminSetup = () => {
                             {managedGroupsList.map((group) => (
                               <div
                                 key={group.id}
-                                className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-3 bg-lightBg dark:bg-gray-700 border border-border dark:border-gray-600 rounded-lg"
+                                className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-3 bg-lightBg border border-border rounded-lg"
                               >
                                 <div className="min-w-0">
-                                  <p className="font-semibold text-text dark:text-white text-sm">
+                                  <p className="font-semibold text-text text-sm">
                                     {group.group_name}
                                   </p>
-                                  <p className="text-xs text-textLight dark:text-gray-400 break-words">
+                                  <p className="text-xs text-textLight break-words">
                                     Base: ₹
                                     {(group.base_price || 0).toLocaleString()} |
                                     Inc: ₹
@@ -1006,13 +1006,13 @@ export const AdminSetup = () => {
           ) : (
             <>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-primary dark:text-secondary">
+                <h2 className="text-2xl font-bold text-primary">
                   Create New Auction
                 </h2>
                 {existingAuctions.length > 0 && (
                   <button
                     onClick={() => setShowCreateNew(false)}
-                    className="text-textLight dark:text-gray-400 hover:text-primary dark:hover:text-secondary text-sm font-semibold"
+                    className="text-textLight hover:text-primary text-sm font-semibold"
                   >
                     Cancel
                   </button>
@@ -1020,13 +1020,13 @@ export const AdminSetup = () => {
               </div>
 
               {/* Template Quick Start */}
-              <div className="card mb-8 bg-gradient-to-r from-primary/10 to-accent/10 dark:from-gray-800 dark:to-gray-700 border-2 border-primary/20 dark:border-secondary/20">
+              <div className="card mb-8 bg-gradient-to-r from-primary/10 to-accent/10 border-2 border-primary/20">
                 <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
                   <div>
-                    <h3 className="text-lg font-bold text-primary dark:text-secondary mb-1">
+                    <h3 className="text-lg font-bold text-primary mb-1">
                       Quick Start with Templates
                     </h3>
-                    <p className="text-sm text-textLight dark:text-gray-400">
+                    <p className="text-sm text-textLight">
                       Load a saved template to auto-fill groups & teams
                       configuration
                     </p>
@@ -1044,12 +1044,12 @@ export const AdminSetup = () => {
 
               {/* Auction Details */}
               <div className="card mb-8">
-                <h2 className="text-2xl font-bold text-primary dark:text-secondary mb-6">
+                <h2 className="text-2xl font-bold text-primary mb-6">
                   Auction Details
                 </h2>
                 <div className="grid md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block font-semibold text-text dark:text-white mb-2">
+                    <label className="block font-semibold text-text mb-2">
                       Auction Name
                     </label>
                     <input
@@ -1339,7 +1339,7 @@ export const AdminSetup = () => {
                       ? setShowCreateNew(false)
                       : navigate(ROUTES.HOME)
                   }
-                  className="btn btn-sm border border-primary text-primary hover:bg-lightBg dark:border-secondary dark:text-secondary"
+                  className="btn btn-sm border border-primary text-primary hover:bg-lightBg"
                 >
                   Back
                 </button>
@@ -1896,11 +1896,11 @@ export const AdminSetup = () => {
         >
           <div className="space-y-4">
             {loadingTemplates ? (
-              <div className="py-8 text-center text-textLight dark:text-gray-400">
+              <div className="py-8 text-center text-textLight">
                 Loading templates...
               </div>
             ) : templates.length === 0 ? (
-              <div className="py-8 text-center text-textLight dark:text-gray-400">
+              <div className="py-8 text-center text-textLight">
                 No templates saved yet. Create an auction configuration and save
                 it as a template to reuse later.
               </div>
@@ -1909,17 +1909,17 @@ export const AdminSetup = () => {
                 {templates.map((template) => (
                   <div
                     key={template.id}
-                    className="p-4 border border-border dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                    className="p-4 border border-border rounded-lg hover:bg-gray-50 transition"
                   >
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
                       <div className="min-w-0">
-                        <h3 className="font-bold text-text dark:text-white mb-1">
+                        <h3 className="font-bold text-text mb-1">
                           {template.template_name}
                         </h3>
-                        <p className="text-sm text-textLight dark:text-gray-400 mb-2">
+                        <p className="text-sm text-textLight mb-2">
                           {template.description}
                         </p>
-                        <p className="text-xs text-textLight dark:text-gray-500">
+                        <p className="text-xs text-textLight">
                           Teams: {template.team_template?.length || 0} | Groups:{" "}
                           {template.group_template?.length || 0} | Mode:{" "}
                           {template.auction_settings?.auction_mode || "N/A"}
@@ -1961,7 +1961,7 @@ export const AdminSetup = () => {
         >
           <div className="space-y-4">
             <div>
-              <label className="block font-semibold text-text dark:text-white mb-2">
+              <label className="block font-semibold text-text mb-2">
                 Template Name *
               </label>
               <input
@@ -1969,11 +1969,11 @@ export const AdminSetup = () => {
                 value={templateName}
                 onChange={(e) => setTemplateName(e.target.value)}
                 placeholder="e.g., IPL Standard 10-Team"
-                className="w-full px-4 py-2 border border-border dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg focus:outline-none focus:border-primary"
+                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary"
               />
             </div>
             <div>
-              <label className="block font-semibold text-text dark:text-white mb-2">
+              <label className="block font-semibold text-text mb-2">
                 Description (Optional)
               </label>
               <textarea
@@ -1981,15 +1981,17 @@ export const AdminSetup = () => {
                 onChange={(e) => setTemplateDescription(e.target.value)}
                 placeholder="Describe this template configuration..."
                 rows="3"
-                className="w-full px-4 py-2 border border-border dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg focus:outline-none focus:border-primary"
+                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary"
               />
             </div>
-            <div className="bg-blue-50 dark:bg-gray-800 border border-blue-200 dark:border-gray-700 rounded-lg p-3">
-              <p className="text-sm text-blue-700 dark:text-blue-300">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-blue-700">
                 <strong>Saved:</strong> {teams.length} teams, {groups.length}{" "}
                 groups
                 <br />
-                <strong>Settings:</strong> ₹{auctionData.purseSize.toLocaleString()} purse, {auctionData.maxPlayers} players
+                <strong>Settings:</strong> ₹
+                {auctionData.purseSize.toLocaleString()} purse,{" "}
+                {auctionData.maxPlayers} players
               </p>
             </div>
           </div>

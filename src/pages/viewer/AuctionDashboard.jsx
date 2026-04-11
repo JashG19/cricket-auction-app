@@ -104,12 +104,10 @@ export const AuctionDashboard = () => {
 
   if (auctionLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-lightBg dark:bg-gray-900 transition-colors">
+      <div className="min-h-screen flex items-center justify-center bg-lightBg transition-colors">
         <div className="text-center">
-          <p className="text-xl text-textLight dark:text-gray-400 mb-4">
-            Loading auction data...
-          </p>
-          <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-primary dark:border-secondary mx-auto"></div>
+          <p className="text-xl text-textLight mb-4">Loading auction data...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-primary mx-auto"></div>
         </div>
       </div>
     );
@@ -117,12 +115,12 @@ export const AuctionDashboard = () => {
 
   if (!auctionData || auctionError) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-lightBg dark:bg-gray-900 transition-colors">
+      <div className="min-h-screen flex items-center justify-center bg-lightBg transition-colors">
         <div className="text-center">
-          <p className="text-2xl font-bold text-primary dark:text-secondary mb-2">
+          <p className="text-2xl font-bold text-primary mb-2">
             Auction Not Found
           </p>
-          <p className="text-textLight dark:text-gray-400 mb-6">
+          <p className="text-textLight mb-6">
             {auctionError ||
               "This auction does not exist or may have been deleted."}
           </p>
@@ -135,18 +133,18 @@ export const AuctionDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-lightBg dark:bg-gray-900 p-3 sm:p-4 transition-colors">
+    <div className="min-h-screen bg-lightBg p-3 sm:p-4 transition-colors">
       <div className="max-w-7xl mx-auto page-enter">
         {/* Header */}
         <div className="mb-4 sm:mb-6">
           <Link
             to="/"
-            className="inline-flex items-center gap-2 text-primary dark:text-secondary hover:text-accent dark:hover:text-yellow-400 mb-3"
+            className="inline-flex items-center gap-2 text-primary hover:text-accent mb-3"
           >
             <IoArrowBack size={20} /> Back
           </Link>
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white dark:bg-gray-800 rounded-lg p-1 shadow-md border border-border dark:border-gray-700 flex-shrink-0">
+            <div className="w-12 h-12 bg-white rounded-lg p-1 shadow-md border border-border flex-shrink-0">
               <img
                 src={pcLogo}
                 alt="PCL 26"
@@ -154,16 +152,16 @@ export const AuctionDashboard = () => {
               />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-4xl font-bold text-primary dark:text-secondary mb-1">
+              <h1 className="text-2xl sm:text-4xl font-bold text-primary mb-1">
                 {auctionData?.name}
               </h1>
-              <p className="text-textLight dark:text-gray-400 text-sm flex items-center gap-2">
+              <p className="text-textLight text-sm flex items-center gap-2">
                 {isAuctionComplete ? (
                   <span className="text-success font-semibold">
                     Auction Complete
                   </span>
                 ) : isAuctionPaused ? (
-                  <span className="text-yellow-600 dark:text-yellow-400 font-semibold">
+                  <span className="text-yellow-600 font-semibold">
                     Auction Paused
                   </span>
                 ) : (
@@ -184,7 +182,7 @@ export const AuctionDashboard = () => {
           {/* Current Player Section (Left) */}
           <div className="lg:col-span-1">
             {currentPlayer && currentGroup ? (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden card-hover">
+              <div className="bg-white rounded-lg shadow-lg overflow-hidden card-hover">
                 {/* Hero Player Photo */}
                 <div className="relative w-full h-56 sm:h-72 lg:h-80">
                   {currentPlayer.photo_url ? (
@@ -225,9 +223,9 @@ export const AuctionDashboard = () => {
                 {/* Compact Info */}
                 <div className="p-3 sm:p-4">
                   <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-textLight dark:text-gray-400">
+                    <span className="text-textLight">
                       Base:{" "}
-                      <span className="font-bold text-text dark:text-white">
+                      <span className="font-bold text-text">
                         ₹{(currentGroup.base_price || 0).toLocaleString()}
                       </span>
                     </span>
@@ -244,13 +242,13 @@ export const AuctionDashboard = () => {
                   )}
 
                   {currentPlayer.unsold && !currentPlayer.soldTo && (
-                    <div className="bg-red-100 dark:bg-red-900/40 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-300 p-3 rounded-lg text-center">
+                    <div className="bg-red-100 border border-red-400 text-red-700 p-3 rounded-lg text-center">
                       <p className="font-bold">Unsold</p>
                     </div>
                   )}
 
                   {!currentPlayer.soldTo && !currentPlayer.unsold && (
-                    <div className="bg-yellow-100 dark:bg-yellow-900/40 border border-yellow-400 dark:border-yellow-700 text-yellow-700 dark:text-yellow-300 p-3 rounded-lg text-center">
+                    <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 p-3 rounded-lg text-center">
                       <p className="font-bold">Currently Live</p>
                     </div>
                   )}
@@ -258,7 +256,7 @@ export const AuctionDashboard = () => {
               </div>
             ) : (
               <div className="card text-center py-8">
-                <p className="text-textLight dark:text-gray-400">
+                <p className="text-textLight">
                   {isAuctionComplete
                     ? "Auction is complete!"
                     : !liveState
@@ -318,21 +316,21 @@ export const AuctionDashboard = () => {
 
           {/* Teams Leaderboard (Right) */}
           <div className="lg:col-span-1">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6 flex flex-col max-h-[600px]">
-              <h3 className="text-lg sm:text-xl font-bold text-primary dark:text-secondary mb-4 flex-shrink-0">
+            <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 flex flex-col max-h-[600px]">
+              <h3 className="text-lg sm:text-xl font-bold text-primary mb-4 flex-shrink-0">
                 Teams ({teamsList.length})
               </h3>
               <div className="flex-1 space-y-2 overflow-y-auto min-h-0">
                 {sortedTeams.map((team, idx) => (
                   <div
                     key={team.id}
-                    className="p-3 border-2 border-border dark:border-gray-700 rounded-lg hover:border-primary dark:hover:border-secondary transition card-hover flex items-start gap-2"
+                    className="p-3 border-2 border-border rounded-lg hover:border-primary transition card-hover flex items-start gap-2"
                   >
                     {team.team_logo && (
                       <img
                         src={getImagePath("team-logo", team.team_logo)}
                         alt={team.team_name}
-                        className="w-10 h-10 object-contain rounded border border-border dark:border-gray-600 flex-shrink-0"
+                        className="w-10 h-10 object-contain rounded border border-border flex-shrink-0"
                         onError={(e) => {
                           e.target.style.display = "none";
                         }}
@@ -340,16 +338,16 @@ export const AuctionDashboard = () => {
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1.5">
-                        <p className="font-bold text-text dark:text-white text-sm truncate">
+                        <p className="font-bold text-text text-sm truncate">
                           #{idx + 1} {team.team_name}
                         </p>
-                        <span className="bg-primary dark:bg-secondary text-white dark:text-primary text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0">
+                        <span className="bg-primary text-white text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0">
                           {team.squad?.length || 0}
                         </span>
                       </div>
 
                       <div className="mb-1.5">
-                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                        <div className="w-full bg-gray-200 rounded-full h-1.5">
                           <div
                             className="bg-secondary h-1.5 rounded-full transition-all"
                             style={{
@@ -376,15 +374,15 @@ export const AuctionDashboard = () => {
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <div className="card card-hover text-center p-4">
-            <p className="text-textLight dark:text-gray-400 text-xs sm:text-base mb-1 sm:mb-2">
+            <p className="text-textLight text-xs sm:text-base mb-1 sm:mb-2">
               Total Players
             </p>
-            <p className="text-2xl sm:text-4xl font-bold text-primary dark:text-white">
+            <p className="text-2xl sm:text-4xl font-bold text-primary">
               {playersList.length}
             </p>
           </div>
           <div className="card card-hover text-center p-4">
-            <p className="text-textLight dark:text-gray-400 text-xs sm:text-base mb-1 sm:mb-2">
+            <p className="text-textLight text-xs sm:text-base mb-1 sm:mb-2">
               Sold Players
             </p>
             <p className="text-2xl sm:text-4xl font-bold text-secondary">
@@ -392,7 +390,7 @@ export const AuctionDashboard = () => {
             </p>
           </div>
           <div className="card card-hover text-center p-4">
-            <p className="text-textLight dark:text-gray-400 text-xs sm:text-base mb-1 sm:mb-2">
+            <p className="text-textLight text-xs sm:text-base mb-1 sm:mb-2">
               Unsold Players
             </p>
             <p className="text-2xl sm:text-4xl font-bold text-danger">
@@ -400,10 +398,10 @@ export const AuctionDashboard = () => {
             </p>
           </div>
           <div className="card card-hover text-center p-4">
-            <p className="text-textLight dark:text-gray-400 text-xs sm:text-base mb-1 sm:mb-2">
+            <p className="text-textLight text-xs sm:text-base mb-1 sm:mb-2">
               Total Spent
             </p>
-            <p className="text-xl sm:text-3xl font-bold text-accent dark:text-secondary">
+            <p className="text-xl sm:text-3xl font-bold text-accent">
               ₹{totalSpent.toLocaleString()}
             </p>
           </div>
@@ -451,13 +449,13 @@ export const AuctionDashboard = () => {
         {/* Player Pool Preview */}
         <div className="card">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-primary dark:text-secondary">
+            <h2 className="text-xl sm:text-2xl font-bold text-primary">
               Player Pool ({filteredPlayers.length})
             </h2>
             <select
               value={selectedGroup}
               onChange={(e) => setSelectedGroup(e.target.value)}
-              className="px-4 py-2 border border-border dark:border-gray-600 rounded-lg focus:outline-none focus:border-primary dark:focus:border-secondary bg-white dark:bg-gray-700 text-text dark:text-white"
+              className="px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary bg-white text-text"
             >
               <option value="all">All Groups</option>
               {groupsList.map((group) => (
@@ -469,7 +467,7 @@ export const AuctionDashboard = () => {
           </div>
 
           {filteredPlayers.length === 0 ? (
-            <p className="text-textLight dark:text-gray-400 py-8 text-center">
+            <p className="text-textLight py-8 text-center">
               No players in this group
             </p>
           ) : (
@@ -487,14 +485,14 @@ export const AuctionDashboard = () => {
                     key={player.id}
                     className={`p-4 border-2 rounded-lg transition card-hover ${
                       player.soldTo
-                        ? "border-success bg-green-50 dark:bg-green-900/30"
-                        : "border-border dark:border-gray-700 hover:border-primary dark:hover:border-secondary"
+                        ? "border-success bg-green-50"
+                        : "border-border hover:border-primary"
                     }`}
                   >
-                    <p className="font-bold text-text dark:text-white mb-1">
+                    <p className="font-bold text-text mb-1">
                       {player.player_name}
                     </p>
-                    <p className="text-xs text-textLight dark:text-gray-400 mb-2">
+                    <p className="text-xs text-textLight mb-2">
                       Age: {player.age}
                     </p>
                     <p className="text-xs mb-2">
@@ -502,7 +500,7 @@ export const AuctionDashboard = () => {
                         {group?.group_name || "N/A"}
                       </span>
                     </p>
-                    <p className="text-sm font-semibold text-primary dark:text-secondary mb-2">
+                    <p className="text-sm font-semibold text-primary mb-2">
                       Base: ₹{(group?.base_price || 0).toLocaleString()}
                     </p>
 
@@ -530,7 +528,7 @@ export const AuctionDashboard = () => {
                     ) : player.unsold ? (
                       <p className="text-xs text-danger font-bold">Unsold</p>
                     ) : (
-                      <p className="text-xs text-textLight dark:text-gray-400">
+                      <p className="text-xs text-textLight">
                         Status:{" "}
                         <span className="text-warning font-bold">Pending</span>
                       </p>
@@ -546,8 +544,8 @@ export const AuctionDashboard = () => {
       {/* Team Selector Modal */}
       {showTeamSelector && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b border-border dark:border-gray-700 bg-gradient-to-r from-purple-600 to-purple-800 text-white">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-purple-600 to-purple-800 text-white">
               <h3 className="text-xl font-bold">Select Your Team</h3>
               <button
                 onClick={() => setShowTeamSelector(false)}
@@ -557,13 +555,13 @@ export const AuctionDashboard = () => {
               </button>
             </div>
             <div className="p-4 overflow-y-auto max-h-[60vh]">
-              <p className="text-textLight dark:text-gray-400 text-sm mb-4">
+              <p className="text-textLight text-sm mb-4">
                 Choose your team to access the private owner dashboard with
                 detailed budget insights and strategy tools.
               </p>
               <div className="space-y-3">
                 {teamsList.length === 0 ? (
-                  <p className="text-center text-textLight dark:text-gray-400 py-8">
+                  <p className="text-center text-textLight py-8">
                     No teams found
                   </p>
                 ) : (
@@ -574,9 +572,9 @@ export const AuctionDashboard = () => {
                         setShowTeamSelector(false);
                         navigate(ROUTES.TEAM_OWNER(auctionId, team.id));
                       }}
-                      className="w-full flex items-center gap-4 p-4 border-2 border-border dark:border-gray-700 rounded-lg hover:border-purple-500 dark:hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/30 transition text-left"
+                      className="w-full flex items-center gap-4 p-4 border-2 border-border rounded-lg hover:border-purple-500 hover:bg-purple-50 transition text-left"
                     >
-                      <div className="w-12 h-12 flex-shrink-0 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden">
+                      <div className="w-12 h-12 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
                         {team.team_logo ? (
                           <img
                             src={getImagePath("team-logo", team.team_logo)}
@@ -587,22 +585,22 @@ export const AuctionDashboard = () => {
                             }}
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-primary dark:text-secondary font-bold text-xl">
+                          <div className="w-full h-full flex items-center justify-center text-primary font-bold text-xl">
                             {team.team_name?.charAt(0) || "T"}
                           </div>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-text dark:text-white truncate">
+                        <p className="font-bold text-text truncate">
                           {team.team_name}
                         </p>
-                        <p className="text-sm text-textLight dark:text-gray-400">
+                        <p className="text-sm text-textLight">
                           Budget: ₹
                           {(team.budget_remaining || 0).toLocaleString()}{" "}
                           remaining
                         </p>
                       </div>
-                      <span className="text-purple-600 dark:text-purple-400 font-semibold text-sm">
+                      <span className="text-purple-600 font-semibold text-sm">
                         →
                       </span>
                     </button>

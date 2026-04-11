@@ -667,19 +667,17 @@ export const AdminLive = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-lightBg dark:bg-gray-900 transition-colors">
+      <div className="min-h-screen flex items-center justify-center bg-lightBg transition-colors">
         <div className="text-center max-w-md">
           {hasError ? (
-            <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-400 p-4 rounded mb-4">
+            <div className="bg-red-100 border border-red-400 text-red-700 p-4 rounded mb-4">
               <p className="font-bold mb-2">Firebase Error:</p>
               <p className="text-sm">{hasError}</p>
             </div>
           ) : (
             <>
-              <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-primary dark:border-secondary mx-auto"></div>
-              <p className="text-textLight dark:text-gray-400 mt-4">
-                Loading auction data...
-              </p>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-primary mx-auto"></div>
+              <p className="text-textLight mt-4">Loading auction data...</p>
             </>
           )}
         </div>
@@ -689,12 +687,12 @@ export const AdminLive = () => {
 
   if (sortedPlayers.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-lightBg dark:bg-gray-900 transition-colors">
+      <div className="min-h-screen flex items-center justify-center bg-lightBg transition-colors">
         <div className="text-center max-w-md">
-          <p className="text-xl text-textLight dark:text-gray-300 mb-4">
+          <p className="text-xl text-textLight mb-4">
             No players added to this auction!
           </p>
-          <p className="text-textLight dark:text-gray-400 mb-6">
+          <p className="text-textLight mb-6">
             Please add players before starting the live auction.
           </p>
           <a href={`/admin/players/${auctionId}`} className="btn btn-primary">
@@ -709,25 +707,23 @@ export const AdminLive = () => {
   if (isAuctionComplete) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary to-darkBg flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-6 sm:p-8 max-w-lg w-full text-center">
-          <h1 className="text-2xl sm:text-3xl font-bold text-primary dark:text-secondary mb-2">
+        <div className="bg-white rounded-lg shadow-2xl p-6 sm:p-8 max-w-lg w-full text-center">
+          <h1 className="text-2xl sm:text-3xl font-bold text-primary mb-2">
             Auction Complete!
           </h1>
-          <p className="text-textLight dark:text-gray-400 mb-6">
+          <p className="text-textLight mb-6">
             All {sortedPlayers.length} players have been processed.
           </p>
 
           <div className="flex justify-center gap-8 mb-6">
             <div className="text-center">
               <p className="text-3xl font-bold text-success">{soldCount}</p>
-              <p className="text-sm text-textLight dark:text-gray-400">Sold</p>
+              <p className="text-sm text-textLight">Sold</p>
             </div>
             {unsoldCount > 0 && (
               <div className="text-center">
                 <p className="text-3xl font-bold text-danger">{unsoldCount}</p>
-                <p className="text-sm text-textLight dark:text-gray-400">
-                  Unsold
-                </p>
+                <p className="text-sm text-textLight">Unsold</p>
               </div>
             )}
           </div>
@@ -833,12 +829,12 @@ export const AdminLive = () => {
     const invalidCount = sortedPlayers.length - validPlayers.length;
 
     return (
-      <div className="min-h-screen flex items-center justify-center bg-lightBg dark:bg-gray-900 transition-colors">
+      <div className="min-h-screen flex items-center justify-center bg-lightBg transition-colors">
         <div className="text-center max-w-lg">
-          <p className="text-xl text-textLight dark:text-gray-300 mb-4">
+          <p className="text-xl text-textLight mb-4">
             Player has invalid group assignment
           </p>
-          <p className="text-textLight dark:text-gray-400 mb-4">
+          <p className="text-textLight mb-4">
             Player <strong>"{currentPlayer?.player_name}"</strong> (#
             {currentPlayerIndex + 1}) has a group_id that doesn't match any
             group.
@@ -1041,7 +1037,7 @@ export const AdminLive = () => {
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-2 sm:gap-4 min-h-0">
             {/* Player Card (Left) */}
             <div className="lg:col-span-1 min-h-0 flex flex-col">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl overflow-hidden relative flex-1 flex flex-col">
+              <div className="bg-white rounded-lg shadow-xl overflow-hidden relative flex-1 flex flex-col">
                 {/* Sold / Unsold badge */}
                 {isPlayerProcessed && (
                   <div
@@ -1099,20 +1095,20 @@ export const AdminLive = () => {
                 {/* Compact Info Row */}
                 <div className="p-2 sm:p-3 flex-shrink-0">
                   <div className="flex items-center justify-between text-xs sm:text-sm">
-                    <span className="text-textLight dark:text-gray-400">
+                    <span className="text-textLight">
                       Base:{" "}
-                      <span className="font-bold text-text dark:text-white">
+                      <span className="font-bold text-text">
                         ₹{(currentGroup.base_price || 0).toLocaleString()}
                       </span>
                     </span>
-                    <span className="text-textLight dark:text-gray-400">
+                    <span className="text-textLight">
                       Inc:{" "}
-                      <span className="font-bold text-text dark:text-white">
+                      <span className="font-bold text-text">
                         ₹{currentGroup.increment_value.toLocaleString()}
                       </span>
                     </span>
                     {currentGroup.max_bid_cap && (
-                      <span className="text-textLight dark:text-gray-400">
+                      <span className="text-textLight">
                         Cap:{" "}
                         <span className="font-bold text-danger">
                           ₹{currentGroup.max_bid_cap.toLocaleString()}
@@ -1174,10 +1170,10 @@ export const AdminLive = () => {
 
             {/* Bidding Panel (Center) */}
             <div className="lg:col-span-1 min-h-0">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-3 sm:p-4 text-center h-full flex flex-col justify-center">
+              <div className="bg-white rounded-lg shadow-xl p-3 sm:p-4 text-center h-full flex flex-col justify-center">
                 {isPlayerProcessed ? (
                   <div>
-                    <p className="text-textLight dark:text-gray-400 mb-1 text-xs sm:text-sm">
+                    <p className="text-textLight mb-1 text-xs sm:text-sm">
                       {currentPlayer.soldTo ? "Sold For" : "Status"}
                     </p>
                     <div
@@ -1190,7 +1186,7 @@ export const AdminLive = () => {
                         : "UNSOLD"}
                     </div>
                     {currentPlayer.soldTo && (
-                      <p className="text-sm sm:text-base text-text dark:text-white mb-3 sm:mb-4">
+                      <p className="text-sm sm:text-base text-text mb-3 sm:mb-4">
                         {
                           teamsList.find(
                             (t) =>
@@ -1221,7 +1217,7 @@ export const AdminLive = () => {
                   </div>
                 ) : (
                   <>
-                    <p className="text-textLight dark:text-gray-400 mb-1 text-xs sm:text-sm">
+                    <p className="text-textLight mb-1 text-xs sm:text-sm">
                       Current Bid
                     </p>
                     <div className="mb-3 sm:mb-4 animate-pulse-bid">
@@ -1232,7 +1228,7 @@ export const AdminLive = () => {
                     </div>
 
                     {auctionPaused && (
-                      <div className="bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-400 dark:border-yellow-600 text-yellow-700 dark:text-yellow-400 px-2 py-2 rounded-lg mb-3 text-xs sm:text-sm">
+                      <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-2 py-2 rounded-lg mb-3 text-xs sm:text-sm">
                         Auction is PAUSED
                       </div>
                     )}
@@ -1283,8 +1279,8 @@ export const AdminLive = () => {
 
             {/* Teams Sidebar (Right) */}
             <div className="lg:col-span-1 min-h-0 overflow-auto">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-2 sm:p-3">
-                <h3 className="text-sm sm:text-base font-bold text-primary dark:text-secondary mb-2">
+              <div className="bg-white rounded-lg shadow-xl p-2 sm:p-3">
+                <h3 className="text-sm sm:text-base font-bold text-primary mb-2">
                   Teams ({teamsList.length})
                 </h3>
                 <div className="space-y-1">
@@ -1307,22 +1303,22 @@ export const AdminLive = () => {
                         key={team.id}
                         className={`py-1.5 px-2 rounded-md border-l-4 transition group relative ${
                           budgetExceeded
-                            ? "border-l-red-500 bg-red-50 dark:bg-red-900/30"
+                            ? "border-l-red-500 bg-red-50"
                             : isIneligible
-                              ? "border-l-orange-400 bg-orange-50 dark:bg-orange-900/30"
-                              : "border-l-green-500 hover:bg-gray-50 dark:hover:bg-gray-700"
+                              ? "border-l-orange-400 bg-orange-50"
+                              : "border-l-green-500 hover:bg-gray-50"
                         }`}
                       >
                         <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-xs sm:text-sm text-text dark:text-white truncate flex-1 min-w-0">
+                          <span className="font-bold text-xs sm:text-sm text-text truncate flex-1 min-w-0">
                             {team.team_name}
                           </span>
                           <span
-                            className={`text-[10px] sm:text-xs font-semibold whitespace-nowrap ${budgetExceeded ? "text-red-600" : "text-textLight dark:text-gray-400"}`}
+                            className={`text-[10px] sm:text-xs font-semibold whitespace-nowrap ${budgetExceeded ? "text-red-600" : "text-textLight"}`}
                           >
                             ₹{(team.budget_remaining || 0).toLocaleString()}
                           </span>
-                          <span className="bg-primary/10 dark:bg-primary/30 text-primary dark:text-secondary text-[10px] sm:text-xs font-bold px-1 py-0.5 rounded whitespace-nowrap">
+                          <span className="bg-primary/10 text-primary text-[10px] sm:text-xs font-bold px-1 py-0.5 rounded whitespace-nowrap">
                             {team.squad?.length || 0}/
                             {auctionData?.max_players_per_team || "∞"}
                           </span>
@@ -1336,7 +1332,7 @@ export const AdminLive = () => {
                           {showStrategyInsights && (
                             <button
                               onClick={() => setSelectedTeamInsight(team.id)}
-                              className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300"
+                              className="text-purple-600 hover:text-purple-800"
                               title="View full insights"
                             >
                               <IoFlash size={12} />
@@ -1346,7 +1342,7 @@ export const AdminLive = () => {
 
                         {/* Strategy insight mini-view */}
                         {showStrategyInsights && insight && (
-                          <div className="mt-1 pt-1 border-t border-gray-200 dark:border-gray-600 text-[10px] sm:text-xs">
+                          <div className="mt-1 pt-1 border-t border-gray-200 text-[10px] sm:text-xs">
                             <div className="flex items-center gap-1 mb-0.5">
                               <span
                                 className={`px-1 py-0.5 rounded font-semibold ${getRiskColorClass(insight.budgetAnalysis.riskLevel)}`}
@@ -1354,7 +1350,7 @@ export const AdminLive = () => {
                                 {insight.budgetAnalysis.riskLevel.icon}{" "}
                                 {insight.budgetAnalysis.riskLevel.level}
                               </span>
-                              <span className="text-gray-500 dark:text-gray-400">
+                              <span className="text-gray-500">
                                 ₹
                                 {insight.budgetAnalysis.flexibleBudget.toLocaleString()}
                               </span>

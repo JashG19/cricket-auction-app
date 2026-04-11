@@ -292,15 +292,15 @@ export const TeamOwnerView = () => {
 
   // Authenticated team dashboard
   return (
-    <div className="min-h-screen bg-lightBg dark:bg-gray-900 p-3 sm:p-6 transition-colors">
+    <div className="min-h-screen bg-lightBg p-3 sm:p-6 transition-colors">
       <div className="max-w-4xl mx-auto page-enter">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
           <div className="min-w-0">
-            <h1 className="text-2xl sm:text-4xl font-bold text-primary dark:text-secondary truncate">
+            <h1 className="text-2xl sm:text-4xl font-bold text-primary truncate">
               {teamData.team_name}
             </h1>
-            <p className="text-textLight dark:text-gray-400 text-sm">
+            <p className="text-textLight text-sm">
               Owner: {teamData.owner_name} | {auctionData?.name}
             </p>
           </div>
@@ -350,18 +350,16 @@ export const TeamOwnerView = () => {
           <div className="card mb-6 border-2 border-secondary">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-3 h-3 bg-success rounded-full animate-pulse"></div>
-              <h2 className="text-lg font-bold text-primary dark:text-secondary">
-                Live Auction
-              </h2>
+              <h2 className="text-lg font-bold text-primary">Live Auction</h2>
               {liveState.isPaused && (
-                <span className="text-xs bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400 px-2 py-1 rounded-full font-bold">
+                <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full font-bold">
                   PAUSED
                 </span>
               )}
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <p className="font-bold text-text dark:text-white text-lg">
+                <p className="font-bold text-text text-lg">
                   {currentLivePlayer.player_name}
                 </p>
                 <p className="text-sm text-textLight">
@@ -389,10 +387,10 @@ export const TeamOwnerView = () => {
         <div className="card mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-primary dark:text-secondary">
+              <h2 className="text-xl sm:text-2xl font-bold text-primary">
                 Private Wishlist ({wishlistSet.size})
               </h2>
-              <p className="text-xs sm:text-sm text-textLight dark:text-gray-400">
+              <p className="text-xs sm:text-sm text-textLight">
                 Visible only on this owner dashboard for this team.
               </p>
             </div>
@@ -415,10 +413,10 @@ export const TeamOwnerView = () => {
                 return (
                   <div
                     key={`wish-${player.id}`}
-                    className="border border-border dark:border-gray-700 rounded-lg p-3 bg-rose-50/60 dark:bg-rose-900/20"
+                    className="border border-border rounded-lg p-3 bg-rose-50/60"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-semibold text-text dark:text-white truncate">
+                      <p className="font-semibold text-text truncate">
                         {player.player_name}
                       </p>
                       <button
@@ -430,7 +428,7 @@ export const TeamOwnerView = () => {
                         <IoHeart className="text-danger" size={16} />
                       </button>
                     </div>
-                    <p className="text-xs text-textLight dark:text-gray-400 mt-1">
+                    <p className="text-xs text-textLight mt-1">
                       {group?.group_name || "N/A"} | Age: {player.age || "N/A"}
                     </p>
                     {isSoldElsewhere && (
@@ -459,13 +457,13 @@ export const TeamOwnerView = () => {
             ))}
           </div>
 
-          <div className="max-h-72 overflow-y-auto border border-border dark:border-gray-700 rounded-lg">
+          <div className="max-h-72 overflow-y-auto border border-border rounded-lg">
             {filteredWishlistCandidates.length === 0 ? (
-              <p className="text-textLight dark:text-gray-400 text-sm p-4">
+              <p className="text-textLight text-sm p-4">
                 No players in this filter.
               </p>
             ) : (
-              <div className="divide-y divide-border dark:divide-gray-700">
+              <div className="divide-y divide-border">
                 {filteredWishlistCandidates.map((player) => {
                   const group = groupsById.get(String(player.group_id));
                   const isWishlisted = wishlistSet.has(String(player.id));
@@ -473,13 +471,13 @@ export const TeamOwnerView = () => {
                   return (
                     <div
                       key={`candidate-${player.id}`}
-                      className="flex items-center justify-between gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800/70"
+                      className="flex items-center justify-between gap-3 p-3 hover:bg-gray-50"
                     >
                       <div className="min-w-0">
-                        <p className="font-semibold text-text dark:text-white truncate">
+                        <p className="font-semibold text-text truncate">
                           {player.player_name}
                         </p>
-                        <p className="text-xs text-textLight dark:text-gray-400">
+                        <p className="text-xs text-textLight">
                           {group?.group_name || "N/A"} | Age:{" "}
                           {player.age || "N/A"}
                         </p>
@@ -487,10 +485,10 @@ export const TeamOwnerView = () => {
                           <span
                             className={`px-2 py-0.5 rounded-full font-semibold ${
                               status === "sold"
-                                ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                                ? "bg-green-100 text-green-700"
                                 : status === "unsold"
-                                  ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
-                                  : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300"
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-yellow-100 text-yellow-700"
                             }`}
                           >
                             {status.toUpperCase()}
@@ -500,7 +498,7 @@ export const TeamOwnerView = () => {
                       <button
                         type="button"
                         onClick={() => handleToggleWishlist(player.id)}
-                        className="p-2 rounded-full border border-border dark:border-gray-600 hover:scale-105 transition"
+                        className="p-2 rounded-full border border-border hover:scale-105 transition"
                         title={
                           isWishlisted
                             ? "Remove from wishlist"
@@ -511,7 +509,7 @@ export const TeamOwnerView = () => {
                           <IoHeart className="text-danger" size={18} />
                         ) : (
                           <IoHeartOutline
-                            className="text-textLight dark:text-gray-400"
+                            className="text-textLight"
                             size={18}
                           />
                         )}
@@ -736,7 +734,7 @@ export const TeamOwnerView = () => {
                           <button
                             type="button"
                             onClick={() => handleToggleWishlist(player.id)}
-                            className="p-2 rounded-full border border-border dark:border-gray-600 hover:scale-105 transition"
+                            className="p-2 rounded-full border border-border hover:scale-105 transition"
                             title={
                               isWishlisted
                                 ? "Remove from wishlist"
@@ -747,7 +745,7 @@ export const TeamOwnerView = () => {
                               <IoHeart className="text-danger" size={16} />
                             ) : (
                               <IoHeartOutline
-                                className="text-textLight dark:text-gray-400"
+                                className="text-textLight"
                                 size={16}
                               />
                             )}
