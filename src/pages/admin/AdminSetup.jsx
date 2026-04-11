@@ -555,9 +555,7 @@ export const AdminSetup = () => {
           <h1 className="text-2xl sm:text-4xl font-bold text-primary mb-2">
             Admin Dashboard
           </h1>
-          <p className="text-textLight mb-8">
-            Manage your cricket auctions
-          </p>
+          <p className="text-textLight mb-8">Manage your cricket auctions</p>
 
           {/* Template Manager Section */}
           <div className="mb-8">
@@ -576,7 +574,9 @@ export const AdminSetup = () => {
             </div>
             <div className="card p-4 text-center text-textLight">
               <p className="text-sm">
-                Save your auction configurations as reusable templates to quickly set up new auctions with the same teams and groups structure.
+                Save your auction configurations as reusable templates to
+                quickly set up new auctions with the same teams and groups
+                structure.
               </p>
             </div>
           </div>
@@ -1989,7 +1989,9 @@ export const AdminSetup = () => {
                 <strong>Saved:</strong> {teams.length} teams, {groups.length}{" "}
                 groups
                 <br />
-                <strong>Settings:</strong> ₹{auctionData.purseSize.toLocaleString()} purse, {auctionData.maxPlayers} players
+                <strong>Settings:</strong> ₹
+                {auctionData.purseSize.toLocaleString()} purse,{" "}
+                {auctionData.maxPlayers} players
               </p>
             </div>
           </div>
@@ -2003,4 +2005,3 @@ export const AdminSetup = () => {
 };
 
 export default AdminSetup;
-
