@@ -416,7 +416,7 @@ export const generateTeamInsights = (
   const budgetAnalysis = analyzeBudget(
     team,
     groupCounts,
-    normalizedGroupName,
+    null,
     groupRules,
     totalPlayersPerTeam,
   );
