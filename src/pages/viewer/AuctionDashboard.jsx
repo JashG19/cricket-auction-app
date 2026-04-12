@@ -144,13 +144,13 @@ export const AuctionDashboard = () => {
             <IoArrowBack size={20} /> Back
           </Link>
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white rounded-lg p-1 shadow-md border border-border flex-shrink-0">
+            <Link to="/" className="w-12 h-12 bg-white rounded-lg p-1 shadow-md border border-border flex-shrink-0 hover:opacity-80 transition-opacity">
               <img
                 src={pcLogo}
                 alt="PCL 26"
                 className="w-full h-full object-contain"
               />
-            </div>
+            </Link>
             <div>
               <h1 className="text-2xl sm:text-4xl font-bold text-primary mb-1">
                 {auctionData?.name}

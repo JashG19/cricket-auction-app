@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import pcLogo from "/images/PCL Logo.png";
 
@@ -7,8 +8,8 @@ export const Header = ({ showBranding = true }) => {
   return (
     <nav className="bg-darkBg bg-opacity-95 backdrop-blur-sm p-4 sm:p-5 border-b-2 border-secondary border-opacity-40 shadow-lg">
       <div className="max-w-6xl mx-auto flex justify-between items-center gap-4">
-        {/* Logo & Branding */}
-        <div className="flex items-center gap-4">
+        {/* Logo & Branding — clickable to home */}
+        <Link to="/" className="flex items-center gap-4 no-underline hover:opacity-90 transition-opacity">
           <div className="w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0 bg-white rounded-lg p-1 shadow-md">
             <img
               src={pcLogo}
@@ -26,7 +27,7 @@ export const Header = ({ showBranding = true }) => {
               </p>
             </div>
           )}
-        </div>
+        </Link>
 
         {/* Right side - User Info */}
         <div className="flex items-center gap-3 sm:gap-4">
