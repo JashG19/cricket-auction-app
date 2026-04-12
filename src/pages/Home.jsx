@@ -23,14 +23,16 @@ export const Home = () => {
     [auctionsData],
   );
 
+  const visibleAuctions = auctionsList.filter((a) => !a.hidden_from_live);
+
   // Separate live, completed, and upcoming auctions
-  const liveAuctions = auctionsList.filter(
+  const liveAuctions = visibleAuctions.filter(
     (a) => a.live_state && !a.live_state.isComplete,
   );
-  const completedAuctions = auctionsList.filter(
+  const completedAuctions = visibleAuctions.filter(
     (a) => a.live_state?.isComplete,
   );
-  const upcomingAuctions = auctionsList.filter((a) => !a.live_state);
+  const upcomingAuctions = visibleAuctions.filter((a) => !a.live_state);
 
   const handleAdminClick = () => {
     if (isAdmin) {
@@ -222,7 +224,7 @@ export const Home = () => {
         )}
 
         {/* No Auctions State */}
-        {auctionsList.length === 0 && (
+        {visibleAuctions.length === 0 && (
           <div className="text-center py-12">
             <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4">
               <IoTime size={40} className="text-gray-400" />

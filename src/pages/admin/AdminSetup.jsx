@@ -30,6 +30,8 @@ import {
   IoShareSocial,
   IoCopy,
   IoSettings,
+  IoEye,
+  IoEyeOff,
   IoSave,
   IoDocumentText,
   IoDownload,
@@ -544,6 +546,21 @@ export const AdminSetup = () => {
     }
   };
 
+  // Hide/show auction from Home "Live Auctions" section
+  const handleToggleLiveVisibility = async (auctionId, isHidden) => {
+    try {
+      await updateAuction(auctionId, { hidden_from_live: !isHidden });
+      showToast(
+        !isHidden
+          ? "Auction hidden from Live Auctions section"
+          : "Auction is visible in Live Auctions section",
+        "success",
+      );
+    } catch (error) {
+      showToast("Error updating visibility: " + error.message, "error");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-lightBg transition-colors duration-300">
       {/* Header */}
@@ -617,6 +634,11 @@ export const AdminSetup = () => {
                         >
                           {auction.status || "setup"}
                         </span>
+                        {auction.hidden_from_live && (
+                          <span className="text-xs px-2 py-1 rounded-full font-bold bg-gray-300 text-gray-800">
+                            Hidden from Live
+                          </span>
+                        )}
                         {deleteConfirmId === auction.id ? (
                           <div className="flex items-center gap-1">
                             <button
@@ -690,6 +712,34 @@ export const AdminSetup = () => {
                         className="btn btn-sm btn-success flex items-center gap-1"
                       >
                         <IoPlay size={16} /> Live Auction
+                      </button>
+                      <button
+                        onClick={() =>
+                          handleToggleLiveVisibility(
+                            auction.id,
+                            !!auction.hidden_from_live,
+                          )
+                        }
+                        className={`btn btn-sm flex items-center gap-1 ${
+                          auction.hidden_from_live
+                            ? "bg-gray-500 text-white hover:bg-gray-600"
+                            : "btn-secondary"
+                        }`}
+                        title={
+                          auction.hidden_from_live
+                            ? "Show in Live Auctions"
+                            : "Hide from Live Auctions"
+                        }
+                      >
+                        {auction.hidden_from_live ? (
+                          <>
+                            <IoEye size={16} /> Show Live
+                          </>
+                        ) : (
+                          <>
+                            <IoEyeOff size={16} /> Hide Live
+                          </>
+                        )}
                       </button>
                       <button
                         onClick={() =>
