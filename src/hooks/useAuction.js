@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { ref, set, push, get, update, remove } from "firebase/database";
 import { db } from "../utils/firebaseConfig";
+import { normalizeGroupName } from "../utils/auctionUtils";
 
 export const useAuction = () => {
   const [auctions, setAuctions] = useState([]);
@@ -284,7 +285,7 @@ export const useAuction = () => {
       // Build groupRules from groups array
       const groupRules = {};
       groups.forEach((group, index) => {
-        const groupName = group.group_name;
+        const groupName = normalizeGroupName(group.group_name);
         groupRules[groupName] = {
           basePrice: parseInt(group.base_price) || 0,
           minPerTeam: parseInt(group.min_per_team) || 1,

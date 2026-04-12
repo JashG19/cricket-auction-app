@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useRealtimeData } from "./useRealtimeData";
+import { normalizeGroupName } from "../utils/auctionUtils";
 
 /**
  * Legacy hardcoded GROUP_RULES for backward compatibility
@@ -47,13 +48,44 @@ export const useAuctionConfig = (auctionId, groupsList = null) => {
       : groupsData;
 
   const config = useMemo(() => {
+    const normalizeRulesMap = (rawRules = {}) => {
+      const normalizedRules = {};
+      Object.entries(rawRules).forEach(([rawName, rule]) => {
+        const normalizedName = normalizeGroupName(rawName, rawRules);
+        normalizedRules[normalizedName] = {
+          ...rule,
+          basePrice: parseInt(rule.basePrice) || 0,
+          minPerTeam: parseInt(rule.minPerTeam) || 1,
+          maxPerTeam: parseInt(rule.maxPerTeam) || 1,
+          order: parseInt(rule.order) || 1,
+          incrementValue: parseInt(rule.incrementValue) || 10,
+          maxBidCap: parseInt(rule.maxBidCap) || 0,
+        };
+      });
+      return normalizedRules;
+    };
+
     // If we have config data, use it
     if (configData?.groupRules) {
+      const normalizedGroupRules = normalizeRulesMap(configData.groupRules);
       return {
-        groupRules: configData.groupRules,
-        totalPlayersPerTeam: configData.totalPlayersPerTeam,
-        totalMinReserve: configData.totalMinReserve,
-        groupOrder: configData.groupOrder || Object.keys(configData.groupRules),
+        groupRules: normalizedGroupRules,
+        totalPlayersPerTeam:
+          configData.totalPlayersPerTeam ||
+          Object.values(normalizedGroupRules).reduce(
+            (sum, rule) => sum + rule.maxPerTeam,
+            0,
+          ),
+        totalMinReserve:
+          configData.totalMinReserve ||
+          Object.values(normalizedGroupRules).reduce(
+            (sum, rule) => sum + rule.basePrice * rule.minPerTeam,
+            0,
+          ),
+        groupOrder:
+          (configData.groupOrder || Object.keys(normalizedGroupRules)).map(
+            (name) => normalizeGroupName(name, normalizedGroupRules),
+          ),
         isLegacy: false,
       };
     }
@@ -64,11 +96,7 @@ export const useAuctionConfig = (auctionId, groupsList = null) => {
       if (groups.length > 0) {
         const groupRules = {};
         groups.forEach((group, index) => {
-          // Normalize the group name (remove "Group " prefix)
-          let groupName = group.group_name || "";
-          if (groupName.toLowerCase().startsWith("group ")) {
-            groupName = groupName.substring(6).trim();
-          }
+          const groupName = normalizeGroupName(group.group_name);
           groupRules[groupName] = {
             basePrice: parseInt(group.base_price) || 0,
             minPerTeam: parseInt(group.min_per_team) || 1,
@@ -135,11 +163,7 @@ export const buildGroupRulesFromGroups = (groups) => {
 
   const groupRules = {};
   groups.forEach((group, index) => {
-    // Normalize the group name (remove "Group " prefix)
-    let groupName = group.group_name || "";
-    if (groupName.toLowerCase().startsWith("group ")) {
-      groupName = groupName.substring(6).trim();
-    }
+    const groupName = normalizeGroupName(group.group_name);
     groupRules[groupName] = {
       basePrice: parseInt(group.base_price) || 0,
       minPerTeam: parseInt(group.min_per_team) || 1,
