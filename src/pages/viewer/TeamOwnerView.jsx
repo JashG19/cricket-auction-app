@@ -585,26 +585,26 @@ export const TeamOwnerView = () => {
               {squad.length === 0 ? (
                 <p className="text-textLight py-4">No players acquired yet</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full table-improved">
+                <div className="overflow-x-auto -mx-4 sm:-mx-6 px-4 sm:px-6 pb-2">
+                  <table className="w-full min-w-[600px] table-improved">
                     <thead>
                       <tr className="border-b-2 border-border">
-                        <th className="text-left py-3 px-3 font-bold text-primary text-sm">
+                        <th className="text-left py-3 px-3 font-bold text-primary text-sm whitespace-nowrap">
                           #
                         </th>
-                        <th className="text-left py-3 px-3 font-bold text-primary text-sm">
+                        <th className="text-left py-3 px-3 font-bold text-primary text-sm whitespace-nowrap">
                           Player
                         </th>
-                        <th className="text-left py-3 px-3 font-bold text-primary text-sm">
+                        <th className="text-left py-3 px-3 font-bold text-primary text-sm whitespace-nowrap">
                           Age
                         </th>
-                        <th className="text-left py-3 px-3 font-bold text-primary text-sm">
+                        <th className="text-left py-3 px-3 font-bold text-primary text-sm whitespace-nowrap">
                           Group
                         </th>
-                        <th className="text-right py-3 px-3 font-bold text-primary text-sm">
+                        <th className="text-right py-3 px-3 font-bold text-primary text-sm whitespace-nowrap">
                           Price
                         </th>
-                        <th className="text-center py-3 px-3 font-bold text-primary text-sm">
+                        <th className="text-center py-3 px-3 font-bold text-primary text-sm whitespace-nowrap">
                           Wishlist
                         </th>
                       </tr>

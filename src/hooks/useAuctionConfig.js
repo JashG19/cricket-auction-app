@@ -82,10 +82,9 @@ export const useAuctionConfig = (auctionId, groupsList = null) => {
             (sum, rule) => sum + rule.basePrice * rule.minPerTeam,
             0,
           ),
-        groupOrder:
-          (configData.groupOrder || Object.keys(normalizedGroupRules)).map(
-            (name) => normalizeGroupName(name, normalizedGroupRules),
-          ),
+        groupOrder: (
+          configData.groupOrder || Object.keys(normalizedGroupRules)
+        ).map((name) => normalizeGroupName(name, normalizedGroupRules)),
         isLegacy: false,
       };
     }

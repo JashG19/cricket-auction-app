@@ -215,26 +215,26 @@ export const AdminResults = () => {
             <h2 className="text-xl sm:text-2xl font-bold text-primary mb-4 sm:mb-6">
               Team-wise Summary
             </h2>
-            <div className="overflow-x-auto">
-              <table className="w-full table-improved">
+            <div className="overflow-x-auto -mx-4 sm:-mx-6 px-4 sm:px-6 pb-2">
+              <table className="w-full min-w-[700px] table-improved">
                 <thead>
                   <tr className="border-b-2 border-border">
-                    <th className="text-left py-4 px-4 font-bold text-primary">
+                    <th className="text-left py-4 px-4 font-bold text-primary whitespace-nowrap">
                       Team
                     </th>
-                    <th className="text-left py-4 px-4 font-bold text-primary">
+                    <th className="text-left py-4 px-4 font-bold text-primary whitespace-nowrap">
                       Owner
                     </th>
-                    <th className="text-right py-4 px-4 font-bold text-primary">
+                    <th className="text-right py-4 px-4 font-bold text-primary whitespace-nowrap">
                       Budget
                     </th>
-                    <th className="text-right py-4 px-4 font-bold text-primary">
+                    <th className="text-right py-4 px-4 font-bold text-primary whitespace-nowrap">
                       Spent
                     </th>
-                    <th className="text-right py-4 px-4 font-bold text-primary">
+                    <th className="text-right py-4 px-4 font-bold text-primary whitespace-nowrap">
                       Remaining
                     </th>
-                    <th className="text-center py-4 px-4 font-bold text-primary">
+                    <th className="text-center py-4 px-4 font-bold text-primary whitespace-nowrap">
                       Players
                     </th>
                   </tr>

@@ -211,23 +211,23 @@ export const TeamDetails = () => {
                     No players yet
                   </p>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full table-improved">
+                  <div className="overflow-x-auto -mx-4 sm:-mx-6 px-4 sm:px-6 pb-2">
+                    <table className="w-full min-w-[600px] table-improved">
                       <thead>
                         <tr className="border-b-2 border-border">
-                          <th className="text-left py-4 px-4 font-bold text-primary">
+                          <th className="text-left py-4 px-4 font-bold text-primary whitespace-nowrap">
                             #
                           </th>
-                          <th className="text-left py-4 px-4 font-bold text-primary">
+                          <th className="text-left py-4 px-4 font-bold text-primary whitespace-nowrap">
                             Player Name
                           </th>
-                          <th className="text-left py-4 px-4 font-bold text-primary">
+                          <th className="text-left py-4 px-4 font-bold text-primary whitespace-nowrap">
                             Age
                           </th>
-                          <th className="text-left py-4 px-4 font-bold text-primary">
+                          <th className="text-left py-4 px-4 font-bold text-primary whitespace-nowrap">
                             Group
                           </th>
-                          <th className="text-right py-4 px-4 font-bold text-primary">
+                          <th className="text-right py-4 px-4 font-bold text-primary whitespace-nowrap">
                             Sold Price
                           </th>
                         </tr>
