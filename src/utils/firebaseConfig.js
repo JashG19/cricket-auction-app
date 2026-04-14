@@ -12,8 +12,7 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
   databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
 };
-console.log("ENV:", import.meta.env);
-console.log("API KEY:", import.meta.env.VITE_FIREBASE_API_KEY);
+
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 

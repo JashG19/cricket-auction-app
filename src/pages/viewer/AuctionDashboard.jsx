@@ -75,6 +75,30 @@ export const AuctionDashboard = () => {
   const isAuctionPaused = liveState?.isPaused ?? false;
   const isAuctionComplete = liveState?.isComplete ?? false;
 
+  const currentPlayerStats = useMemo(() => {
+    const stats = currentPlayer?.stats;
+    if (!stats) return null;
+
+    const batting = stats.batting || {};
+    const bowling = stats.bowling || {};
+    const highlights = stats.highlights || {};
+
+    return {
+      batting: {
+        matches: batting.matches ?? 0,
+        runs: batting.runs ?? 0,
+        strikeRate: batting.strikeRate ?? highlights.battingStrikeRate ?? 0,
+        average: batting.average ?? highlights.battingAverage ?? 0,
+      },
+      bowling: {
+        matches: bowling.matches ?? 0,
+        wickets: bowling.wickets ?? highlights.bowlingWickets ?? 0,
+        economy: bowling.economy ?? highlights.bowlingEconomy ?? 0,
+        average: bowling.average ?? highlights.bowlingAverage ?? 0,
+      },
+    };
+  }, [currentPlayer?.stats]);
+
   // Filter players by group
   const filteredPlayers =
     selectedGroup === "all"
@@ -294,25 +318,99 @@ export const AuctionDashboard = () => {
                 </div>
               )}
 
-              <div className="bg-white bg-opacity-20 rounded-lg p-3 sm:p-4 w-full">
-                <p className="text-sm opacity-90 mb-1 sm:mb-2">
-                  Increment Value
-                </p>
-                <p className="text-2xl sm:text-3xl font-bold">
-                  ₹{(currentGroup?.increment_value || 0).toLocaleString()}
-                </p>
-              </div>
+               {currentGroup?.max_bid_cap && (
+                 <div className="mt-6 pt-6 border-t border-white border-opacity-30 w-full">
+                   <p className="text-sm opacity-90 mb-2">Max Bid Cap</p>
+                   <p className="text-2xl font-bold">
+                     ₹{currentGroup.max_bid_cap.toLocaleString()}
+                   </p>
+                 </div>
+               )}
 
-              {currentGroup?.max_bid_cap && (
-                <div className="mt-6 pt-6 border-t border-white border-opacity-30 w-full">
-                  <p className="text-sm opacity-90 mb-2">Max Bid Cap</p>
-                  <p className="text-2xl font-bold">
-                    ₹{currentGroup.max_bid_cap.toLocaleString()}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+               {currentPlayerStats && (
+                 <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+                   <div className="bg-white/15 border border-white/25 rounded-xl p-4 text-left">
+                     <p className="text-secondary text-xs uppercase tracking-[0.18em] mb-3">
+                       Batting Spotlight
+                     </p>
+                     <div className="space-y-2">
+                       <p className="flex justify-between gap-4 text-sm">
+                         <span className="text-white/80">Matches</span>
+                         <span className="font-bold text-base">
+                           {currentPlayerStats.batting.matches}
+                         </span>
+                       </p>
+                       <p className="flex justify-between gap-4 text-sm">
+                         <span className="text-white/80">Runs</span>
+                         <span className="font-bold text-base">
+                           {currentPlayerStats.batting.runs}
+                         </span>
+                       </p>
+                       <p className="flex justify-between gap-4 text-sm">
+                         <span className="text-white/80">Strike Rate</span>
+                         <span
+                           className={`font-bold text-base ${
+                             currentPlayerStats.batting.strikeRate >= 140
+                               ? "text-emerald-300"
+                               : "text-white"
+                           }`}
+                         >
+                           {Number(currentPlayerStats.batting.strikeRate).toFixed(
+                             2,
+                           )}
+                         </span>
+                       </p>
+                       <p className="flex justify-between gap-4 text-sm">
+                         <span className="text-white/80">Average</span>
+                         <span className="font-bold text-base">
+                           {Number(currentPlayerStats.batting.average).toFixed(2)}
+                         </span>
+                       </p>
+                     </div>
+                   </div>
+
+                   <div className="bg-white/15 border border-white/25 rounded-xl p-4 text-left">
+                     <p className="text-cyan-300 text-xs uppercase tracking-[0.18em] mb-3">
+                       Bowling Spotlight
+                     </p>
+                     <div className="space-y-2">
+                       <p className="flex justify-between gap-4 text-sm">
+                         <span className="text-white/80">Matches</span>
+                         <span className="font-bold text-base">
+                           {currentPlayerStats.bowling.matches}
+                         </span>
+                       </p>
+                       <p className="flex justify-between gap-4 text-sm">
+                         <span className="text-white/80">Wickets</span>
+                         <span className="font-bold text-base">
+                           {currentPlayerStats.bowling.wickets}
+                         </span>
+                       </p>
+                       <p className="flex justify-between gap-4 text-sm">
+                         <span className="text-white/80">Economy</span>
+                         <span
+                           className={`font-bold text-base ${
+                             currentPlayerStats.bowling.economy > 0 &&
+                             currentPlayerStats.bowling.economy < 7
+                               ? "text-emerald-300"
+                               : "text-white"
+                           }`}
+                         >
+                           {Number(currentPlayerStats.bowling.economy).toFixed(2)}
+                         </span>
+                       </p>
+                       <p className="flex justify-between gap-4 text-sm">
+                         <span className="text-white/80">Average</span>
+                         <span className="font-bold text-base">
+                           {Number(currentPlayerStats.bowling.average).toFixed(2)}
+                         </span>
+                       </p>
+                     </div>
+                   </div>
+                 </div>
+               )}
+             </div>
+           </div>
 
           {/* Teams Leaderboard (Right) */}
           <div className="lg:col-span-1">

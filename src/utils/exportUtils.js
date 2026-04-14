@@ -365,3 +365,21 @@ export const parsePlayersCSV = (file) => {
     });
   });
 };
+
+/**
+ * Parse career stats CSV for player stats sync
+ */
+export const parseCareerStatsCSV = (file) => {
+  return new Promise((resolve, reject) => {
+    Papa.parse(file, {
+      complete: (results) => {
+        resolve(results.data);
+      },
+      error: (error) => {
+        reject(error);
+      },
+      header: true,
+      skipEmptyLines: true,
+    });
+  });
+};

@@ -41,6 +41,13 @@ export const ProjectorScreen = () => {
   );
   const groupsById = useMemo(() => createLookupMap(groupsList), [groupsList]);
   const teamsById = useMemo(() => createLookupMap(teamsList), [teamsList]);
+  const sortedTeamsByBalance = useMemo(
+    () =>
+      [...teamsList].sort(
+        (a, b) => (b.budget_remaining || 0) - (a.budget_remaining || 0),
+      ),
+    [teamsList],
+  );
 
   // Resolve current player
   const currentPlayer = useMemo(() => {
@@ -57,6 +64,30 @@ export const ProjectorScreen = () => {
   const currentGroup = currentPlayer
     ? groupsById.get(String(currentPlayer.group_id))
     : null;
+
+  const currentPlayerStats = useMemo(() => {
+    const stats = currentPlayer?.stats;
+    if (!stats) return null;
+
+    const batting = stats.batting || {};
+    const bowling = stats.bowling || {};
+    const highlights = stats.highlights || {};
+
+    return {
+      batting: {
+        matches: batting.matches ?? 0,
+        runs: batting.runs ?? 0,
+        strikeRate: batting.strikeRate ?? highlights.battingStrikeRate ?? 0,
+        average: batting.average ?? highlights.battingAverage ?? 0,
+      },
+      bowling: {
+        matches: bowling.matches ?? 0,
+        wickets: bowling.wickets ?? highlights.bowlingWickets ?? 0,
+        economy: bowling.economy ?? highlights.bowlingEconomy ?? 0,
+        average: bowling.average ?? highlights.bowlingAverage ?? 0,
+      },
+    };
+  }, [currentPlayer?.stats]);
 
   const liveBid = liveState?.currentBid ?? 0;
   const isPaused = liveState?.isPaused ?? false;
@@ -188,11 +219,7 @@ export const ProjectorScreen = () => {
             Team Balances
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-            {teamsList
-              .sort(
-                (a, b) => (b.budget_remaining || 0) - (a.budget_remaining || 0),
-              )
-              .map((team, idx) => (
+            {sortedTeamsByBalance.map((team) => (
                 <div
                   key={team.id}
                   className="bg-white/10 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-white/20 hover:border-secondary/50 transition-all"
@@ -295,53 +322,26 @@ export const ProjectorScreen = () => {
                 <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-2 leading-tight">
                   {currentPlayer.player_name}
                 </h2>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                   <span className="text-white/70 text-lg sm:text-xl">
                     Age: {currentPlayer.age}
                   </span>
                   <span className="bg-secondary text-primary px-3 py-1 rounded-lg text-sm sm:text-base font-bold">
                     {currentGroup.group_name}
                   </span>
+                  <span className="bg-white/15 text-white px-3 py-1 rounded-lg text-sm sm:text-base font-bold">
+                    Base: ₹{(currentGroup.base_price || 0).toLocaleString()}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Bid Panel */}
+          {/* Bid + Stats Panel */}
           <div className="flex flex-col items-center text-center lg:text-left space-y-6 lg:space-y-8">
-            {/* Base Price + Increment Info */}
-            <div className="flex gap-6 sm:gap-10">
-              <div>
-                <p className="text-white/50 text-sm sm:text-base uppercase tracking-wider mb-1">
-                  Base Price
-                </p>
-                <p className="text-2xl sm:text-3xl font-bold text-white">
-                  ₹{(currentGroup.base_price || 0).toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <p className="text-white/50 text-sm sm:text-base uppercase tracking-wider mb-1">
-                  Increment
-                </p>
-                <p className="text-2xl sm:text-3xl font-bold text-white">
-                  ₹{(currentGroup.increment_value || 0).toLocaleString()}
-                </p>
-              </div>
-              {currentGroup.max_bid_cap && (
-                <div>
-                  <p className="text-white/50 text-sm sm:text-base uppercase tracking-wider mb-1">
-                    Max Cap
-                  </p>
-                  <p className="text-2xl sm:text-3xl font-bold text-red-400">
-                    ₹{currentGroup.max_bid_cap.toLocaleString()}
-                  </p>
-                </div>
-              )}
-            </div>
-
             {/* Current Bid - HUGE */}
             <div>
-              <p className="text-white/60 text-lg sm:text-xl uppercase tracking-widest mb-2">
+              <p className="text-white/60 text-xl sm:text-2xl uppercase tracking-widest mb-2">
                 {currentPlayer.soldTo ? "Sold For" : "Current Bid"}
               </p>
               <div className="animate-pulse-bid">
@@ -352,7 +352,7 @@ export const ProjectorScreen = () => {
                       : liveBid
                   }
                   duration={400}
-                  className="text-6xl sm:text-8xl lg:text-9xl font-bold text-secondary drop-shadow-lg"
+                  className="text-7xl sm:text-9xl lg:text-[10rem] font-bold text-secondary drop-shadow-lg"
                 />
               </div>
             </div>
@@ -390,6 +390,87 @@ export const ProjectorScreen = () => {
                 <p className="text-4xl sm:text-5xl font-bold text-red-400">
                   UNSOLD
                 </p>
+              </div>
+            )}
+
+            {currentPlayerStats && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 w-full max-w-3xl">
+                <div className="bg-white/10 border border-white/20 rounded-2xl p-6 backdrop-blur-sm">
+                  <p className="text-secondary text-sm uppercase tracking-[0.2em] mb-4">
+                    Batting Spotlight
+                  </p>
+                  <div className="space-y-3 text-white text-xl">
+                    <p className="flex justify-between gap-5">
+                      <span className="text-white/70">Matches</span>
+                      <span className="font-bold text-2xl">
+                        {currentPlayerStats.batting.matches}
+                      </span>
+                    </p>
+                    <p className="flex justify-between gap-5">
+                      <span className="text-white/70">Runs</span>
+                      <span className="font-bold text-2xl">
+                        {currentPlayerStats.batting.runs}
+                      </span>
+                    </p>
+                    <p className="flex justify-between gap-5">
+                      <span className="text-white/70">Strike Rate</span>
+                      <span
+                        className={`font-bold text-2xl ${
+                          currentPlayerStats.batting.strikeRate >= 140
+                            ? "text-emerald-300"
+                            : "text-white"
+                        }`}
+                      >
+                        {Number(currentPlayerStats.batting.strikeRate).toFixed(2)}
+                      </span>
+                    </p>
+                    <p className="flex justify-between gap-5">
+                      <span className="text-white/70">Average</span>
+                      <span className="font-bold text-2xl">
+                        {Number(currentPlayerStats.batting.average).toFixed(2)}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-white/10 border border-white/20 rounded-2xl p-6 backdrop-blur-sm">
+                  <p className="text-cyan-300 text-sm uppercase tracking-[0.2em] mb-4">
+                    Bowling Spotlight
+                  </p>
+                  <div className="space-y-3 text-white text-xl">
+                    <p className="flex justify-between gap-5">
+                      <span className="text-white/70">Matches</span>
+                      <span className="font-bold text-2xl">
+                        {currentPlayerStats.bowling.matches}
+                      </span>
+                    </p>
+                    <p className="flex justify-between gap-5">
+                      <span className="text-white/70">Wickets</span>
+                      <span className="font-bold text-2xl">
+                        {currentPlayerStats.bowling.wickets}
+                      </span>
+                    </p>
+                    <p className="flex justify-between gap-5">
+                      <span className="text-white/70">Economy</span>
+                      <span
+                        className={`font-bold text-2xl ${
+                          currentPlayerStats.bowling.economy > 0 &&
+                          currentPlayerStats.bowling.economy < 7
+                            ? "text-emerald-300"
+                            : "text-white"
+                        }`}
+                      >
+                        {Number(currentPlayerStats.bowling.economy).toFixed(2)}
+                      </span>
+                    </p>
+                    <p className="flex justify-between gap-5">
+                      <span className="text-white/70">Average</span>
+                      <span className="font-bold text-2xl">
+                        {Number(currentPlayerStats.bowling.average).toFixed(2)}
+                      </span>
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </div>

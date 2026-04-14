@@ -6,7 +6,7 @@ import { useToast } from "../../components/Toast";
 import { ToastContainer } from "../../components/ToastContainer";
 import { Modal } from "../../components/Modal";
 import { Header } from "../../components/Header";
-import { parsePlayersCSV } from "../../utils/exportUtils";
+import { parsePlayersCSV, parseCareerStatsCSV } from "../../utils/exportUtils";
 import { validatePlayer } from "../../utils/validationUtils";
 import { ROUTES } from "../../constants/routes";
 import {
@@ -31,6 +31,91 @@ const EMPTY_FORM = {
   group_id: "",
   photo_url: "",
 };
+
+const normalizeName = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/\bcricket profile\b/g, " ")
+    .replace(/\bprofile\b/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const getNameTokens = (value) => {
+  const normalized = normalizeName(value);
+  return normalized ? normalized.split(" ") : [];
+};
+
+const toNumberOrNull = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const toNumberOrZero = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const buildPlayerStatsPayload = (row) => ({
+  source: {
+    provider: "cricheroes",
+    player_id: row.player_id || null,
+    player_url: row.player_url || null,
+    stats_url: row.stats_url || null,
+    player_name_clean: row.player_name_clean || null,
+  },
+  batting: {
+    matches: toNumberOrNull(row.bat_matches),
+    innings: toNumberOrNull(row.bat_innings),
+    notOut: toNumberOrNull(row.bat_not_out),
+    runs: toNumberOrNull(row.bat_runs),
+    highest: row.bat_highest_runs || null,
+    average: toNumberOrNull(row.bat_avg),
+    strikeRate: toNumberOrNull(row.bat_sr),
+    thirties: toNumberOrNull(row.bat_30s),
+    fifties: toNumberOrNull(row.bat_50s),
+    hundreds: toNumberOrNull(row.bat_100s),
+    fours: toNumberOrNull(row.bat_4s),
+    sixes: toNumberOrNull(row.bat_6s),
+  },
+  bowling: {
+    matches: toNumberOrNull(row.bowl_matches),
+    innings: toNumberOrNull(row.bowl_innings),
+    overs: row.bowl_overs || null,
+    maidens: toNumberOrNull(row.bowl_maidens),
+    wickets: toNumberOrNull(row.bowl_wickets),
+    runsConceded: toNumberOrNull(row.bowl_runs_conceded),
+    best: row.bowl_best_bowling || null,
+    threeWickets: toNumberOrNull(row.bowl_3w),
+    fiveWickets: toNumberOrNull(row.bowl_5w),
+    economy: toNumberOrNull(row.bowl_economy),
+    average: toNumberOrNull(row.bowl_avg),
+    strikeRate: toNumberOrNull(row.bowl_sr),
+    wides: toNumberOrNull(row.bowl_wides),
+    noBalls: toNumberOrNull(row.bowl_noballs),
+    dotBalls: toNumberOrNull(row.bowl_dot_balls),
+    foursConceded: toNumberOrNull(row.bowl_4s),
+    sixesConceded: toNumberOrNull(row.bowl_6s),
+  },
+  fielding: {
+    matches: toNumberOrNull(row.field_matches),
+    catches: toNumberOrNull(row.field_catches),
+    stumpings: toNumberOrNull(row.field_stumpings),
+    runOuts: toNumberOrNull(row.field_run_outs),
+    assistedRunOuts: toNumberOrNull(row.field_assisted_run_outs),
+    caughtBehind: toNumberOrNull(row.field_caught_behind),
+  },
+  highlights: {
+    battingStrikeRate: toNumberOrZero(row.bat_sr),
+    battingRuns: toNumberOrZero(row.bat_runs),
+    battingAverage: toNumberOrZero(row.bat_avg),
+    bowlingWickets: toNumberOrZero(row.bowl_wickets),
+    bowlingEconomy: toNumberOrZero(row.bowl_economy),
+    bowlingAverage: toNumberOrZero(row.bowl_avg),
+  },
+  updated_at: new Date().toISOString(),
+});
 
 export const AdminPlayers = () => {
   const { auctionId } = useParams();
@@ -448,6 +533,193 @@ export const AdminPlayers = () => {
     }
   };
 
+  // Bulk upload career stats CSV with safe matching
+  const handleStatsUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const csvRows = await parseCareerStatsCSV(file);
+      const playersByExactName = new Map();
+      const playersByFirstName = new Map();
+      const playersByToken = new Map();
+
+      playersList.forEach((player) => {
+        const normalizedFull = normalizeName(player.player_name);
+        if (!normalizedFull) return;
+
+        if (!playersByExactName.has(normalizedFull)) {
+          playersByExactName.set(normalizedFull, []);
+        }
+        playersByExactName.get(normalizedFull).push(player);
+
+        const tokens = getNameTokens(player.player_name);
+        const firstName = tokens[0];
+        if (!firstName) return;
+        if (!playersByFirstName.has(firstName)) {
+          playersByFirstName.set(firstName, []);
+        }
+        playersByFirstName.get(firstName).push(player);
+
+        const uniqueTokens = new Set(tokens.filter(Boolean));
+        uniqueTokens.forEach((token) => {
+          if (!playersByToken.has(token)) {
+            playersByToken.set(token, []);
+          }
+          playersByToken.get(token).push(player);
+        });
+      });
+
+      const updatesByPlayerId = new Map();
+      const ambiguousRows = [];
+      const unmatchedRows = [];
+      let matchedRows = 0;
+
+      for (const row of csvRows) {
+        const csvCleanName = row.player_name_clean;
+        const csvUrl = row.player_url || "";
+        const csvSlug = csvUrl.split("/").filter(Boolean).pop() || "";
+        const slugName = normalizeName(csvSlug.replace(/-/g, " "));
+        const normalizedClean = normalizeName(csvCleanName);
+
+        if (!normalizedClean && !slugName) {
+          unmatchedRows.push(row);
+          continue;
+        }
+
+        const exactCandidates = [];
+        if (normalizedClean && playersByExactName.has(normalizedClean)) {
+          exactCandidates.push(...playersByExactName.get(normalizedClean));
+        }
+        if (slugName && playersByExactName.has(slugName)) {
+          exactCandidates.push(...playersByExactName.get(slugName));
+        }
+
+        const uniqueExact = Array.from(
+          new Map(exactCandidates.map((p) => [String(p.id), p])).values(),
+        );
+
+        let matchedPlayer = null;
+        if (uniqueExact.length === 1) {
+          matchedPlayer = uniqueExact[0];
+        } else if (uniqueExact.length > 1) {
+          const candidatesWithAge = uniqueExact.filter(
+            (p) => p.age && toNumberOrNull(row.age) && Number(p.age) === Number(row.age),
+          );
+          if (candidatesWithAge.length === 1) {
+            matchedPlayer = candidatesWithAge[0];
+          } else {
+            ambiguousRows.push({
+              csvName: csvCleanName || slugName || "unknown",
+              candidates: uniqueExact.map((p) => p.player_name),
+            });
+            continue;
+          }
+        } else {
+          const fallbackName = normalizedClean || slugName;
+          const fallbackFirstName = fallbackName.split(" ")[0];
+          const firstNameCandidates = playersByFirstName.get(fallbackFirstName) || [];
+          if (firstNameCandidates.length > 1) {
+            ambiguousRows.push({
+              csvName: csvCleanName || slugName || "unknown",
+              candidates: firstNameCandidates.map((p) => p.player_name),
+            });
+            continue;
+          }
+          if (firstNameCandidates.length === 1) {
+            // Safe to match by first name only when that first name is unique in this auction.
+            matchedPlayer = firstNameCandidates[0];
+          } else {
+            const csvTokens = getNameTokens(fallbackName);
+            const tokenCandidates = [];
+            csvTokens.forEach((token) => {
+              const candidates = playersByToken.get(token) || [];
+              tokenCandidates.push(...candidates);
+            });
+
+            const uniqueTokenCandidates = Array.from(
+              new Map(tokenCandidates.map((p) => [String(p.id), p])).values(),
+            );
+
+            if (uniqueTokenCandidates.length === 1) {
+              matchedPlayer = uniqueTokenCandidates[0];
+            } else if (uniqueTokenCandidates.length > 1) {
+              const csvTokenSet = new Set(csvTokens);
+              const scoredCandidates = uniqueTokenCandidates
+                .map((candidate) => {
+                  const candidateTokens = new Set(
+                    getNameTokens(candidate.player_name),
+                  );
+                  let overlap = 0;
+                  csvTokenSet.forEach((token) => {
+                    if (candidateTokens.has(token)) overlap += 1;
+                  });
+                  return { candidate, overlap };
+                })
+                .filter((item) => item.overlap > 0)
+                .sort((a, b) => b.overlap - a.overlap);
+
+              if (
+                scoredCandidates.length > 0 &&
+                scoredCandidates[0].overlap >
+                  (scoredCandidates[1]?.overlap || 0)
+              ) {
+                matchedPlayer = scoredCandidates[0].candidate;
+              } else {
+                ambiguousRows.push({
+                  csvName: csvCleanName || slugName || "unknown",
+                  candidates: uniqueTokenCandidates.map((p) => p.player_name),
+                });
+                continue;
+              }
+            }
+          }
+        }
+
+        if (!matchedPlayer) {
+          unmatchedRows.push(row);
+          continue;
+        }
+
+        matchedRows++;
+        updatesByPlayerId.set(String(matchedPlayer.id), {
+          stats: buildPlayerStatsPayload(row),
+        });
+      }
+
+      const updates = Array.from(updatesByPlayerId.entries());
+      const BATCH_SIZE = 20;
+      let updatedCount = 0;
+
+      for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+        const batch = updates.slice(i, i + BATCH_SIZE);
+        const result = await Promise.allSettled(
+          batch.map(([playerId, payload]) =>
+            update(ref(db, `auctions/${auctionId}/players/${playerId}`), payload),
+          ),
+        );
+        updatedCount += result.filter((r) => r.status === "fulfilled").length;
+      }
+
+      const summary = `${updatedCount} players updated (${matchedRows} matched rows, ${ambiguousRows.length} ambiguous, ${unmatchedRows.length} unmatched)`;
+      if (ambiguousRows.length > 0) {
+        console.table(ambiguousRows.slice(0, 20));
+      }
+      if (unmatchedRows.length > 0) {
+        console.table(
+          unmatchedRows.slice(0, 20).map((row) => ({
+            player_name_clean: row.player_name_clean || null,
+            player_url: row.player_url || null,
+          })),
+        );
+      }
+      showToast(summary, updatedCount > 0 ? "success" : "error");
+      e.target.value = "";
+    } catch (error) {
+      showToast("Error uploading stats CSV: " + error.message, "error");
+    }
+  };
+
   // Download CSV template
   const downloadTemplate = () => {
     const groupNames = groupsList.map((g) => g.group_name).join(", ");
@@ -580,6 +852,15 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
                   type="file"
                   accept=".csv"
                   onChange={handleBulkUpload}
+                  hidden
+                />
+              </label>
+              <label className="btn btn-sm btn-secondary cursor-pointer flex items-center gap-1">
+                <IoDownload size={16} /> Stats CSV
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleStatsUpload}
                   hidden
                 />
               </label>

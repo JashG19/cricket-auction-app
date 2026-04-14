@@ -1,0 +1,52 @@
+Goal Description
+Show key career stats beside the active player on the projector screen with minimal latency, while integrating players_career_stats.csv safely into Firebase.
+
+Confirmed Context
+- Projector screen file is: src/pages/viewer/ProjectorScreen.jsx
+- Priority is performance (reduce lag) over optional infrastructure changes
+- Uploading to Firebase is acceptable and preferred for runtime speed
+
+Proposed Integration Strategy
+Do NOT parse stats CSV on the projector/frontend during live auction. Instead, ingest once in AdminPlayers and persist structured stats into each player record in Firebase. Projector then reads already-linked stats with normal realtime data, avoiding heavy parsing/matching work during live display.
+
+Proposed Changes
+1. Data Integration (Admin Panel)
+[MODIFY] src/pages/admin/AdminPlayers.jsx
+- Add an "Upload Career Stats CSV" control.
+- Implement handleStatsUpload with PapaParse and batched Firebase updates.
+- Save curated fields under player.stats (e.g., batting + bowling blocks + source metadata).
+- Show upload summary: matched, ambiguous, unmatched, updated.
+
+2. Matching Logic (Handle same first names safely)
+[NEW] deterministic multi-step matcher (no first-name-only match)
+- Step 1 (exact): normalize(full_name_from_csv) == normalize(player.player_name)
+- Step 2 (strict fallback): if CSV has aliases/clean names, compare normalized aliases to normalized full player name.
+- Step 3 (disambiguation keys): when multiple players share same normalized token, require at least one secondary key match (group, age, team/history field if available in CSV).
+- Step 4 (ambiguous bucket): if still multiple matches, do not auto-write; log as ambiguous for manual mapping.
+- Step 5 (unmatched bucket): log rows with no confident match.
+
+Important rule:
+- Never auto-assign stats using first name alone (e.g., multiple "Aarya" entries).
+
+3. Projector UI + Performance
+[MODIFY] src/pages/viewer/ProjectorScreen.jsx
+- Add compact stats panel near current player card (batting/bowling highlights).
+- Render only small, precomputed display fields from player.stats (no expensive transforms in render path).
+- Memoize derived display values; avoid sorting/filtering work on every tick where possible.
+- Keep image fallback lightweight and avoid extra animation complexity that can drop frames.
+
+Lag Reduction Plan (Primary Concern)
+- Pre-ingest stats into Firebase once (major win).
+- Keep projector payload slim: only fields needed for live display in player.stats.
+- Avoid client-side CSV parsing or fuzzy search during auction runtime.
+- Batch admin writes to reduce network chatter.
+- For ambiguous matches, require manual resolution upfront rather than runtime guessing.
+
+Verification Plan
+- Upload career stats CSV from AdminPlayers and confirm:
+  - Correct players get stats
+  - Ambiguous/unmatched rows are reported, not silently assigned
+- Open projector screen and verify:
+  - Stats panel appears for current player
+  - Missing stats degrades gracefully
+  - Live transitions remain smooth without added lag spikes
