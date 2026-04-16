@@ -30,7 +30,7 @@ import {
 
 // Tab definitions
 const TABS = [
-  { key: "myPlayers", label: "My Players", icon: IoPeople },
+  { key: "myPlayers", label: "My Squad", icon: IoPeople },
   { key: "strategy", label: "Strategy", icon: IoStatsChart },
   { key: "wishlist", label: "Wishlist", icon: IoHeart },
   { key: "allPlayers", label: "All Players", icon: IoList },
@@ -539,7 +539,7 @@ export const TeamOwnerView = () => {
         )}
 
         {/* ===== TAB BAR ===== */}
-        <div className="owner-tab-bar mb-6">
+        <div className="overflow-x-auto owner-tab-bar mb-6">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.key;
