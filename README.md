@@ -76,8 +76,13 @@ A comprehensive cricket auction management application built with React, Firebas
    VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
    VITE_FIREBASE_APP_ID=your_app_id
    VITE_FIREBASE_DATABASE_URL=your_database_url
-   VITE_ADMIN_EMAIL=your_admin_email@example.com
    ```
+
+   - Grant your first admin role once:
+     ```bash
+     ADMIN_EMAIL=your_admin_email@example.com ADMIN_PASSWORD=your_admin_password npm run admin:grant
+     ```
+     (On PowerShell, set env vars first: `$env:ADMIN_EMAIL="..."`; `$env:ADMIN_PASSWORD="..."`)
 
 5. **Start Development Server**
    ```bash

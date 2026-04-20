@@ -4,20 +4,56 @@ import {
   signOut,
   onAuthStateChanged,
 } from "firebase/auth";
+import { onValue, ref } from "firebase/database";
 import { auth } from "../utils/firebaseConfig";
+import { db } from "../utils/firebaseConfig";
 
 export const useAuth = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
+    let unsubscribeAdmin = null;
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (unsubscribeAdmin) {
+        unsubscribeAdmin();
+        unsubscribeAdmin = null;
+      }
+
       setUser(currentUser);
-      setLoading(false);
+      setError(null);
+
+      if (!currentUser) {
+        setIsAdmin(false);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      const adminRef = ref(db, `admin_roles/${currentUser.uid}`);
+      unsubscribeAdmin = onValue(
+        adminRef,
+        (snapshot) => {
+          setIsAdmin(snapshot.val() === true);
+          setLoading(false);
+        },
+        (err) => {
+          setError(err.message);
+          setIsAdmin(false);
+          setLoading(false);
+        },
+      );
     });
 
-    return unsubscribe;
+    return () => {
+      if (unsubscribeAdmin) {
+        unsubscribeAdmin();
+      }
+      unsubscribe();
+    };
   }, []);
 
   const login = async (email, password) => {
@@ -29,9 +65,8 @@ export const useAuth = () => {
       return result.user;
     } catch (err) {
       setError(err.message);
-      throw err;
-    } finally {
       setLoading(false);
+      throw err;
     }
   };
 
@@ -43,9 +78,8 @@ export const useAuth = () => {
       setUser(null);
     } catch (err) {
       setError(err.message);
-      throw err;
-    } finally {
       setLoading(false);
+      throw err;
     }
   };
 
@@ -55,6 +89,6 @@ export const useAuth = () => {
     error,
     login,
     logout,
-    isAdmin: user && user.email === import.meta.env.VITE_ADMIN_EMAIL,
+    isAdmin,
   };
 };

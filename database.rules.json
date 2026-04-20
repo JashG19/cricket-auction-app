@@ -1,35 +1,41 @@
 {
   "rules": {
+    "admin_roles": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && (root.child('admin_roles').child(auth.uid).val() === true || !root.child('admin_roles').hasChildren())"
+      }
+    },
     "auctions": {
       // Anyone can read auction data (viewers need this)
       ".read": true,
 
       // Only authenticated admin can create new auctions
-      ".write": "auth != null && auth.token.email === 'jashgandhi46@gmail.com'",
+      ".write": "auth != null && root.child('admin_roles').child(auth.uid).val() === true",
 
       "$auctionId": {
         // Only authenticated admin can write auction data
-        ".write": "auth != null && auth.token.email === 'jashgandhi46@gmail.com'",
+        ".write": "auth != null && root.child('admin_roles').child(auth.uid).val() === true",
 
         "players": {
           ".read": true,
-          ".write": "auth != null && auth.token.email === 'jashgandhi46@gmail.com'"
+          ".write": "auth != null && root.child('admin_roles').child(auth.uid).val() === true"
         },
         "teams": {
           ".read": true,
-          ".write": "auth != null && auth.token.email === 'jashgandhi46@gmail.com'"
+          ".write": "auth != null && root.child('admin_roles').child(auth.uid).val() === true"
         },
         "groups": {
           ".read": true,
-          ".write": "auth != null && auth.token.email === 'jashgandhi46@gmail.com'"
+          ".write": "auth != null && root.child('admin_roles').child(auth.uid).val() === true"
         },
         "bidding": {
           ".read": true,
-          ".write": "auth != null && auth.token.email === 'jashgandhi46@gmail.com'"
+          ".write": "auth != null && root.child('admin_roles').child(auth.uid).val() === true"
         },
         "live_state": {
           ".read": true,
-          ".write": "auth != null && auth.token.email === 'jashgandhi46@gmail.com'"
+          ".write": "auth != null && root.child('admin_roles').child(auth.uid).val() === true"
         }
       }
     },
