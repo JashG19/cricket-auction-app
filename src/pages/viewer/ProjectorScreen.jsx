@@ -8,7 +8,7 @@ import {
 } from "../../utils/dataTransformUtils";
 import { AnimatedNumber } from "../../components/AnimatedNumber";
 import confetti from "canvas-confetti";
-import pcLogo from "/images/PCL Logo.png";
+import pcLogo from "/PCL_Logo.png";
 
 export const ProjectorScreen = () => {
   const { auctionId } = useParams();

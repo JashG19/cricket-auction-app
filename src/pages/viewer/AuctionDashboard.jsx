@@ -11,7 +11,7 @@ import {
 import { ROUTES } from "../../constants/routes";
 import { IoArrowBack, IoClose } from "react-icons/io5";
 import { AnimatedNumber } from "../../components/AnimatedNumber";
-import pcLogo from "/images/PCL Logo.png";
+import pcLogo from "/PCL_Logo.png";
 
 export const AuctionDashboard = () => {
   const { auctionId } = useParams();

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import pcLogo from "/images/PCL Logo.png";
+import pcLogo from "/PCL_Logo.png";
 
 export const Header = ({ showBranding = true }) => {
   const { user, isAdmin } = useAuth();

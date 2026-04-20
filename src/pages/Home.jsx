@@ -126,16 +126,14 @@ export const Home = () => {
               : "Real-time bidding, team management, and comprehensive analytics for cricket auctions."}
           </p>
 
-          {/* Admin Panel Button - Small and Secondary */}
-          {isAdmin && (
-            <button
-              onClick={handleAdminClick}
-              className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white font-semibold py-2 px-4 rounded-lg transition text-sm border border-white/20"
-            >
-              <IoSettings size={16} />
-              Admin Panel
-            </button>
-          )}
+          {/* Admin Access Button - Always visible */}
+          <button
+            onClick={handleAdminClick}
+            className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white font-semibold py-2 px-4 rounded-lg transition text-sm border border-white/20"
+          >
+            <IoSettings size={16} />
+            {isAdmin ? "Admin Panel" : "Admin Login"}
+          </button>
         </div>
 
         {/* Upcoming/Available Auctions */}
@@ -232,14 +230,12 @@ export const Home = () => {
             <p className="text-gray-400 text-lg mb-4">
               No auctions available yet
             </p>
-            {isAdmin && (
-              <button
-                onClick={handleAdminClick}
-                className="bg-secondary hover:bg-yellow-400 text-primary font-bold py-3 px-6 rounded-lg transition"
-              >
-                Create Your First Auction
-              </button>
-            )}
+            <button
+              onClick={handleAdminClick}
+              className="bg-secondary hover:bg-yellow-400 text-primary font-bold py-3 px-6 rounded-lg transition"
+            >
+              {isAdmin ? "Create Your First Auction" : "Admin Login"}
+            </button>
           </div>
         )}
       </div>
