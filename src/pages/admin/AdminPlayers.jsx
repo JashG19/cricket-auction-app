@@ -21,9 +21,12 @@ import {
   IoArrowBack,
   IoPencil,
   IoSwapHorizontal,
+  IoLayers,
 } from "react-icons/io5";
 import { ref, update } from "firebase/database";
 import { db } from "../../utils/firebaseConfig";
+
+const UNASSIGNED_GROUP_ID = "__unassigned__";
 
 const EMPTY_FORM = {
   player_name: "",
@@ -134,6 +137,11 @@ export const AdminPlayers = () => {
   const [playerForm, setPlayerForm] = useState({ ...EMPTY_FORM });
   const [selectedGroup, setSelectedGroup] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
+  const [showSegregationModal, setShowSegregationModal] = useState(false);
+  const [segregationForm, setSegregationForm] = useState({
+    sourceGroup: UNASSIGNED_GROUP_ID,
+    targetGroup: "",
+  });
   const [showSaleModal, setShowSaleModal] = useState(false);
   const [salePlayer, setSalePlayer] = useState(null);
   const [saleForm, setSaleForm] = useState({ soldTo: "", soldPrice: "" });
@@ -146,7 +154,10 @@ export const AdminPlayers = () => {
   const filteredPlayers = useMemo(() => {
     let filtered = playersList;
     if (selectedGroup !== "all") {
-      filtered = filtered.filter((p) => String(p.group_id) === selectedGroup);
+      filtered =
+        selectedGroup === UNASSIGNED_GROUP_ID
+          ? filtered.filter((p) => !p.group_id)
+          : filtered.filter((p) => String(p.group_id) === selectedGroup);
     }
     if (selectedStatus === "sold") {
       filtered = filtered.filter((p) => p.soldTo);
@@ -167,13 +178,24 @@ export const AdminPlayers = () => {
 
   // Group counts for the filter bar
   const groupCounts = useMemo(() => {
-    const counts = new Map();
+    const counts = new Map([[UNASSIGNED_GROUP_ID, 0]]);
     playersList.forEach((p) => {
-      const gid = String(p.group_id);
+      const gid = p.group_id ? String(p.group_id) : UNASSIGNED_GROUP_ID;
       counts.set(gid, (counts.get(gid) || 0) + 1);
     });
     return counts;
   }, [playersList]);
+  const unassignedPlayersCount = groupCounts.get(UNASSIGNED_GROUP_ID) || 0;
+
+  const segregationCandidates = useMemo(() => {
+    if (segregationForm.sourceGroup === "all") return playersList;
+    if (segregationForm.sourceGroup === UNASSIGNED_GROUP_ID) {
+      return playersList.filter((p) => !p.group_id);
+    }
+    return playersList.filter(
+      (p) => String(p.group_id) === String(segregationForm.sourceGroup),
+    );
+  }, [playersList, segregationForm.sourceGroup]);
 
   // Open add modal
   const openAddModal = () => {
@@ -320,12 +342,14 @@ export const AdminPlayers = () => {
               );
               return;
             }
-            // Group limit check
-            const playerGroup = groupsList.find(
-              (g) => String(g.id) === String(salePlayer.group_id),
-            );
-            const groupMax = Number(playerGroup?.max_per_team) || Infinity;
-            if (groupMax !== Infinity) {
+            // Group limit check (only when player is assigned to a known group)
+            const playerGroup = salePlayer.group_id
+              ? groupsList.find(
+                  (g) => String(g.id) === String(salePlayer.group_id),
+                )
+              : null;
+            const groupMax = Number(playerGroup?.max_per_team || 0);
+            if (playerGroup && groupMax > 0) {
               const groupCount = playersList.filter(
                 (p) =>
                   String(p.group_id) === String(salePlayer.group_id) &&
@@ -481,28 +505,27 @@ export const AdminPlayers = () => {
       // Prepare valid players first
       const validPlayers = [];
       let skippedCount = 0;
+      let unmatchedGroupCount = 0;
       for (const player of csvPlayers) {
         if (!player.player_name) {
           if (Object.values(player).some((v) => v)) skippedCount++;
           continue;
         }
 
-        const groupId = resolveGroupId(
-          player.group_id || player.group_name || player.group,
-        );
-        if (!groupId) {
-          skippedCount++;
-          continue;
+        const rawGroupValue = player.group_id || player.group_name || player.group;
+        const groupId = rawGroupValue ? resolveGroupId(rawGroupValue) : "";
+        if (rawGroupValue && !groupId) {
+          unmatchedGroupCount++;
         }
 
         const playerData = {
           player_name: player.player_name,
           age: Number(player.age),
-          group_id: groupId,
+          group_id: groupId || "",
           photo_url: player.photo_filename || player.photo_url || "",
         };
 
-        const errors = validatePlayer(playerData);
+        const errors = validatePlayer(playerData, { requireGroup: false });
         if (!errors) {
           validPlayers.push(playerData);
         } else {
@@ -524,9 +547,13 @@ export const AdminPlayers = () => {
 
       const msg =
         skippedCount > 0
-          ? `${addedCount} players added, ${skippedCount} skipped (invalid data or unmatched group)`
+          ? `${addedCount} players added, ${skippedCount} skipped (invalid data)`
           : `${addedCount} players added successfully!`;
-      showToast(msg, addedCount > 0 ? "success" : "error");
+      const unmatchedGroupMsg =
+        unmatchedGroupCount > 0
+          ? ` ${unmatchedGroupCount} player(s) were imported as Unassigned due to unmatched group values.`
+          : "";
+      showToast(`${msg}${unmatchedGroupMsg}`, addedCount > 0 ? "success" : "error");
       e.target.value = "";
     } catch (error) {
       showToast("Error uploading CSV: " + error.message, "error");
@@ -723,14 +750,14 @@ export const AdminPlayers = () => {
   // Download CSV template
   const downloadTemplate = () => {
     const groupNames = groupsList.map((g) => g.group_name).join(", ");
-    const exampleGroup = groupsList[0]?.group_name || "Group A+";
+    const exampleGroup = groupsList[0]?.group_name || "";
     const template = `player_name,age,group_name,photo_filename
 Virat Kohli,35,${exampleGroup},virat_kohli.jpg
-Rohit Sharma,36,${exampleGroup},rohit_sharma.jpg
+Rohit Sharma,36,,rohit_sharma.jpg
 Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
 
-# Available groups: ${groupNames}
-# Base price is set per group, not per player
+# Group is optional. Leave group_name blank to add player as Unassigned
+# Available groups: ${groupNames || "Create groups in setup first"}
 # Place photos in public/images/player-photos/ folder`;
 
     const element = document.createElement("a");
@@ -741,6 +768,57 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
     element.setAttribute("download", "players_template.csv");
     element.click();
     showToast("Template downloaded!", "success");
+  };
+
+  const handleApplySegregation = async () => {
+    if (!segregationForm.targetGroup) {
+      showToast("Select the target group", "error");
+      return;
+    }
+
+    if (segregationForm.sourceGroup === segregationForm.targetGroup) {
+      showToast("Source and target group cannot be the same", "error");
+      return;
+    }
+
+    const candidates = segregationCandidates.filter(
+      (player) => String(player.group_id || "") !== String(segregationForm.targetGroup),
+    );
+
+    if (candidates.length === 0) {
+      showToast("No players to move for this selection", "error");
+      return;
+    }
+
+    try {
+      const updates = {};
+      candidates.forEach((player) => {
+        updates[`${player.id}/group_id`] = segregationForm.targetGroup;
+      });
+      await update(ref(db, `auctions/${auctionId}/players`), updates);
+      const targetGroupName =
+        groupsList.find((g) => String(g.id) === String(segregationForm.targetGroup))
+          ?.group_name || "selected group";
+      showToast(
+        `${candidates.length} player(s) moved to ${targetGroupName}`,
+        "success",
+      );
+      setShowSegregationModal(false);
+    } catch (error) {
+      showToast("Failed to segregate players: " + error.message, "error");
+    }
+  };
+
+  const handleGoLive = () => {
+    if (unassignedPlayersCount > 0) {
+      setSelectedGroup(UNASSIGNED_GROUP_ID);
+      showToast(
+        `Assign groups to ${unassignedPlayersCount} unassigned player(s) before starting live auction`,
+        "error",
+      );
+      return;
+    }
+    navigate(ROUTES.ADMIN_LIVE(auctionId));
   };
 
   // Player form fields (shared between add and edit)
@@ -775,7 +853,9 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
           />
         </div>
         <div>
-          <label className="block font-semibold text-text mb-2">Group</label>
+          <label className="block font-semibold text-text mb-2">
+            Group (Optional)
+          </label>
           <select
             value={playerForm.group_id}
             onChange={(e) =>
@@ -783,7 +863,7 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
             }
             className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary"
           >
-            <option value="">Select Group</option>
+            <option value="">Assign Later (Unassigned)</option>
             {groupsList.map((group) => (
               <option key={group.id} value={group.id}>
                 {group.group_name} (Base: ₹
@@ -791,6 +871,11 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
               </option>
             ))}
           </select>
+          {groupsList.length === 0 && (
+            <p className="text-xs text-textLight mt-1">
+              No groups created yet. You can assign groups later.
+            </p>
+          )}
         </div>
       </div>
 
@@ -870,9 +955,24 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
               >
                 <IoAdd size={18} /> Add
               </button>
+              {playersList.length > 0 && groupsList.length > 0 && (
+                <button
+                  onClick={() => {
+                    setSegregationForm((prev) => ({
+                      ...prev,
+                      sourceGroup: UNASSIGNED_GROUP_ID,
+                      targetGroup: groupsList[0]?.id || "",
+                    }));
+                    setShowSegregationModal(true);
+                  }}
+                  className="btn btn-sm btn-secondary flex items-center gap-1"
+                >
+                  <IoLayers size={16} /> Segregate
+                </button>
+              )}
               {playersList.length > 0 && (
                 <button
-                  onClick={() => navigate(ROUTES.ADMIN_LIVE(auctionId))}
+                  onClick={handleGoLive}
                   className="btn btn-sm flex items-center gap-1 bg-success hover:bg-green-700 text-white"
                 >
                   Live <IoArrowForward size={16} />
@@ -882,7 +982,7 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
           </div>
 
           {/* Group Filter Bar */}
-          {groupsList.length > 0 && playersList.length > 0 && (
+          {playersList.length > 0 && (
             <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-2">
               <span className="text-sm font-semibold text-textLight mr-1">
                 Group:
@@ -896,6 +996,16 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
                 }`}
               >
                 All ({playersList.length})
+              </button>
+              <button
+                onClick={() => setSelectedGroup(UNASSIGNED_GROUP_ID)}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition flex-shrink-0 ${
+                  selectedGroup === UNASSIGNED_GROUP_ID
+                    ? "bg-primary text-white"
+                    : "bg-white border border-border text-textLight hover:border-primary"
+                }`}
+              >
+                Unassigned ({unassignedPlayersCount})
               </button>
               {groupsList.map((group) => {
                 const count = groupCounts.get(String(group.id)) || 0;
@@ -1045,17 +1155,27 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
                           </td>
                           <td className="py-4 px-4 text-text">{player.age}</td>
                           <td className="py-4 px-4">
-                            <span className="bg-secondary text-primary px-3 py-1 rounded-full text-sm font-bold">
-                              {group?.group_name || "N/A"}
+                            <span
+                              className={`px-3 py-1 rounded-full text-sm font-bold ${
+                                !player.group_id
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-secondary text-primary"
+                              }`}
+                            >
+                              {!player.group_id
+                                ? "Unassigned"
+                                : group?.group_name || "Unknown Group"}
                             </span>
-                            {!group && (
+                            {player.group_id && !group && (
                               <span className="block text-xs text-danger mt-1">
                                 Bad ID: {player.group_id}
                               </span>
                             )}
                           </td>
                           <td className="py-4 px-4 text-text font-semibold">
-                            ₹{(group?.base_price || 0).toLocaleString()}
+                            {!player.group_id
+                              ? "—"
+                              : `₹${(group?.base_price || 0).toLocaleString()}`}
                           </td>
                           <td className="py-4 px-4">
                             {getStatusBadge(player)}
@@ -1130,9 +1250,11 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
               <div className="bg-lightBg p-3 rounded-lg">
                 <p className="font-bold text-text">{salePlayer.player_name}</p>
                 <p className="text-xs text-textLight">
-                  {groupsList.find(
-                    (g) => String(g.id) === String(salePlayer.group_id),
-                  )?.group_name || "Unknown Group"}
+                  {!salePlayer.group_id
+                    ? "Unassigned Group"
+                    : groupsList.find(
+                        (g) => String(g.id) === String(salePlayer.group_id),
+                      )?.group_name || "Unknown Group"}
                   {salePlayer.soldTo && (
                     <span>
                       {" "}
@@ -1190,6 +1312,67 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
               )}
             </div>
           )}
+        </Modal>
+
+        <Modal
+          isOpen={showSegregationModal}
+          title="Segregate Players into Groups"
+          onClose={() => setShowSegregationModal(false)}
+          onConfirm={handleApplySegregation}
+          confirmText="Apply Segregation"
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block font-semibold text-text mb-2">
+                Move players from
+              </label>
+              <select
+                value={segregationForm.sourceGroup}
+                onChange={(e) =>
+                  setSegregationForm({
+                    ...segregationForm,
+                    sourceGroup: e.target.value,
+                  })
+                }
+                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary"
+              >
+                <option value={UNASSIGNED_GROUP_ID}>Unassigned players</option>
+                <option value="all">All players</option>
+                {groupsList.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.group_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-text mb-2">
+                To target group
+              </label>
+              <select
+                value={segregationForm.targetGroup}
+                onChange={(e) =>
+                  setSegregationForm({
+                    ...segregationForm,
+                    targetGroup: e.target.value,
+                  })
+                }
+                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary"
+              >
+                <option value="">Select target group</option>
+                {groupsList.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.group_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <p className="text-sm text-textLight">
+              {segregationCandidates.length} player(s) match the selected source.
+            </p>
+          </div>
         </Modal>
 
         {/* Toast Notifications */}

@@ -68,7 +68,8 @@ export const validateGroup = (groupData) => {
   return Object.keys(errors).length === 0 ? null : errors;
 };
 
-export const validatePlayer = (playerData) => {
+export const validatePlayer = (playerData, options = {}) => {
+  const { requireGroup = false } = options;
   const errors = {};
 
   if (!playerData.player_name || playerData.player_name.trim() === "") {
@@ -79,7 +80,7 @@ export const validatePlayer = (playerData) => {
     errors.age = "Valid age is required";
   }
 
-  if (!playerData.group_id) {
+  if (requireGroup && !playerData.group_id) {
     errors.group_id = "Player group is required";
   }
 
