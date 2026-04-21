@@ -1,7 +1,8 @@
-import { initializeApp } from "firebase/app";
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { initializeApp } from "firebase/app";
+import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 
 const parseEnvFile = (filePath) => {
   if (!fs.existsSync(filePath)) return;
@@ -62,30 +63,59 @@ const firebaseConfig = {
   databaseURL: process.env.VITE_FIREBASE_DATABASE_URL,
 };
 
+const hashPin = (pinValue) =>
+  createHash("sha256").update(String(pinValue).trim()).digest("hex");
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const credentials = await signInWithEmailAndPassword(auth, email, password);
 const idToken = await credentials.user.getIdToken();
-const uid = credentials.user.uid;
 
 const dbUrl = process.env.VITE_FIREBASE_DATABASE_URL.replace(/\/+$/, "");
-const endpoint = `${dbUrl}/admin_roles/${uid}.json?auth=${idToken}`;
 
-const response = await fetch(endpoint, {
-  method: "PUT",
-  headers: { "Content-Type": "application/json" },
-  body: "true",
-});
-
-if (!response.ok) {
-  const body = await response.text();
-  console.error(`Failed to grant admin role (${response.status}): ${body}`);
-  if (response.status === 401 || response.status === 403) {
-    console.error(
-      "This account is not allowed to grant admin roles yet. Seed the first admin manually in Realtime Database at admin_roles/<uid>=true.",
-    );
-  }
+const auctionsRes = await fetch(`${dbUrl}/auctions.json?auth=${idToken}`);
+if (!auctionsRes.ok) {
+  console.error(`Failed to read auctions (${auctionsRes.status})`);
   process.exit(1);
 }
 
-console.log(`Admin role granted for uid=${uid}`);
+const auctions = (await auctionsRes.json()) || {};
+let migrated = 0;
+
+for (const [auctionId, auctionData] of Object.entries(auctions)) {
+  const teams = auctionData?.teams;
+  if (!teams || typeof teams !== "object") continue;
+
+  for (const [teamId, teamData] of Object.entries(teams)) {
+    if (!teamData || typeof teamData !== "object") continue;
+    if (teamData.pin_hash) continue;
+    const legacyPin = teamData.pin;
+    if (!legacyPin) continue;
+
+    const updatedTeam = {
+      ...teamData,
+      pin_hash: hashPin(legacyPin),
+      pin: null,
+    };
+
+    const writeRes = await fetch(
+      `${dbUrl}/auctions/${auctionId}/teams/${teamId}.json?auth=${idToken}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedTeam),
+      },
+    );
+
+    if (!writeRes.ok) {
+      const body = await writeRes.text();
+      console.error(
+        `Failed migrating auction=${auctionId} team=${teamId} (${writeRes.status}): ${body}`,
+      );
+      process.exit(1);
+    }
+    migrated += 1;
+  }
+}
+
+console.log(`PIN migration complete. Teams migrated: ${migrated}`);

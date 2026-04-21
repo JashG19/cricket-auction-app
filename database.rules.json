@@ -3,7 +3,7 @@
     "admin_roles": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid && (root.child('admin_roles').child(auth.uid).val() === true || !root.child('admin_roles').hasChildren())"
+        ".write": "auth != null && root.child('admin_roles').child(auth.uid).val() === true"
       }
     },
     "auctions": {
@@ -23,7 +23,13 @@
         },
         "teams": {
           ".read": true,
-          ".write": "auth != null && root.child('admin_roles').child(auth.uid).val() === true"
+          ".write": "auth != null && root.child('admin_roles').child(auth.uid).val() === true",
+          "$teamId": {
+            "pin": {
+              ".read": false,
+              ".write": "auth != null && root.child('admin_roles').child(auth.uid).val() === true"
+            }
+          }
         },
         "groups": {
           ".read": true,

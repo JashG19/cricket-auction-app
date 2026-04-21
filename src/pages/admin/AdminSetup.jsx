@@ -15,6 +15,7 @@ import {
   firebaseObjectToArray,
   getImagePath,
 } from "../../utils/dataTransformUtils";
+import { hashPin, normalizePin } from "../../utils/securityUtils";
 import { ROUTES } from "../../constants/routes";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuctionTemplate } from "../../hooks/useAuctionTemplate";
@@ -140,6 +141,24 @@ export const AdminSetup = () => {
     max_per_team: "",
   });
 
+  const buildTeamPayload = async (formData, existingTeam = null) => {
+    const pin = normalizePin(formData.pin);
+    const payload = {
+      ...formData,
+      pin: null,
+    };
+    if (pin) {
+      payload.pin_hash = await hashPin(pin);
+    } else if (existingTeam?.pin_hash) {
+      payload.pin_hash = existingTeam.pin_hash;
+    } else if (existingTeam?.pin) {
+      payload.pin_hash = await hashPin(existingTeam.pin);
+    } else {
+      payload.pin_hash = "";
+    }
+    return payload;
+  };
+
   // Handle auction creation
   const handleCreateAuction = async () => {
     const errors = validateAuctionSetup(auctionData);
@@ -166,8 +185,8 @@ export const AdminSetup = () => {
       // Add teams and groups in parallel
       await Promise.all([
         Promise.all(
-          teams.map(({ id, ...teamDataWithoutId }) =>
-            addTeam(auctionId, teamDataWithoutId),
+          teams.map(async ({ id, ...teamDataWithoutId }) =>
+            addTeam(auctionId, await buildTeamPayload(teamDataWithoutId)),
           ),
         ),
         Promise.all(
@@ -191,7 +210,7 @@ export const AdminSetup = () => {
   };
 
   // Add team
-  const handleAddTeam = () => {
+  const handleAddTeam = async () => {
     const errors = validateTeam(teamForm);
     if (errors) {
       showToast("Please fill team details correctly", "error");
@@ -208,22 +227,27 @@ export const AdminSetup = () => {
       return;
     }
 
-    setTeams([
-      ...teams,
-      {
-        ...teamForm,
-        id: `local_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      },
-    ]);
-    setTeamForm({
-      team_name: "",
-      owner_name: "",
-      budget_total: "",
-      pin: "",
-      team_logo: "",
-    });
-    setShowTeamModal(false);
-    showToast("Team added", "success");
+    try {
+      const teamPayload = await buildTeamPayload(teamForm);
+      setTeams([
+        ...teams,
+        {
+          ...teamPayload,
+          id: `local_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        },
+      ]);
+      setTeamForm({
+        team_name: "",
+        owner_name: "",
+        budget_total: "",
+        pin: "",
+        team_logo: "",
+      });
+      setShowTeamModal(false);
+      showToast("Team added", "success");
+    } catch (error) {
+      showToast("Failed to secure team PIN: " + error.message, "error");
+    }
   };
 
   // Add group
@@ -482,7 +506,7 @@ export const AdminSetup = () => {
             team_name: team.team_name || "",
             owner_name: team.owner_name || "",
             budget_total: team.budget_total || "",
-            pin: team.pin || "",
+            pin: "",
             team_logo: team.team_logo || "",
           }
         : {
@@ -506,14 +530,19 @@ export const AdminSetup = () => {
 
     try {
       if (editingExistingTeam) {
+        const payload = await buildTeamPayload(
+          existingTeamForm,
+          editingExistingTeam,
+        );
         await updateTeam(
           managingTeamsAuctionId,
           editingExistingTeam.id,
-          existingTeamForm,
+          payload,
         );
         showToast(`${existingTeamForm.team_name} updated`, "success");
       } else {
-        await addTeam(managingTeamsAuctionId, existingTeamForm);
+        const payload = await buildTeamPayload(existingTeamForm);
+        await addTeam(managingTeamsAuctionId, payload);
         showToast("Team added!", "success");
       }
       setShowExistingTeamModal(false);

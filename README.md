@@ -78,11 +78,20 @@ A comprehensive cricket auction management application built with React, Firebas
    VITE_FIREBASE_DATABASE_URL=your_database_url
    ```
 
-   - Grant your first admin role once:
+   - Seed the first admin in Firebase Realtime Database console:
+     - path: `admin_roles/<your-auth-uid>`
+     - value: `true`
+
+   - After at least one admin exists, grant additional admins with:
+      ```bash
+      ADMIN_EMAIL=your_admin_email@example.com ADMIN_PASSWORD=your_admin_password npm run admin:grant
+      ```
+      (On PowerShell, set env vars first: `$env:ADMIN_EMAIL="..."`; `$env:ADMIN_PASSWORD="..."`)
+
+   - Migrate legacy plaintext team PINs to hashed PINs:
      ```bash
-     ADMIN_EMAIL=your_admin_email@example.com ADMIN_PASSWORD=your_admin_password npm run admin:grant
+     ADMIN_EMAIL=your_admin_email@example.com ADMIN_PASSWORD=your_admin_password npm run pins:migrate
      ```
-     (On PowerShell, set env vars first: `$env:ADMIN_EMAIL="..."`; `$env:ADMIN_PASSWORD="..."`)
 
 5. **Start Development Server**
    ```bash

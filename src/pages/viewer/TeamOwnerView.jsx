@@ -27,6 +27,7 @@ import {
   formatCurrency,
   getRiskColorClass,
 } from "../../utils/strategyInsights";
+import { verifyPin } from "../../utils/securityUtils";
 
 // Tab definitions
 const TABS = [
@@ -340,11 +341,19 @@ export const TeamOwnerView = () => {
   };
 
   // PIN validation
-  const handlePinSubmit = (e) => {
+  const handlePinSubmit = async (e) => {
     e.preventDefault();
     if (!teamData) return;
 
-    if (String(pinInput) === String(teamData.pin)) {
+    let isValidPin = false;
+    if (teamData.pin_hash) {
+      isValidPin = await verifyPin(pinInput, teamData.pin_hash);
+    } else if (teamData.pin) {
+      // Backward compatibility for old teams before hashed PIN migration.
+      isValidPin = String(pinInput) === String(teamData.pin);
+    }
+
+    if (isValidPin) {
       setAuthenticated(true);
       setPinError("");
       localStorage.setItem(`team_pin_${auctionId}_${teamId}`, "true");
