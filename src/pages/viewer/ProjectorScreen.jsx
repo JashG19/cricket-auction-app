@@ -8,7 +8,7 @@ import {
 } from "../../utils/dataTransformUtils";
 import { AnimatedNumber } from "../../components/AnimatedNumber";
 import confetti from "canvas-confetti";
-import pcLogo from "/PCL_Logo.png";
+import pcLogo from "/images/PCL Logo.png";
 
 export const ProjectorScreen = () => {
   const { auctionId } = useParams();
@@ -24,6 +24,9 @@ export const ProjectorScreen = () => {
   const { data: groupsData } = useRealtimeData(`auctions/${auctionId}/groups`);
   const { data: liveState } = useRealtimeData(
     `auctions/${auctionId}/live_state`,
+  );
+  const { data: liveBidData } = useRealtimeData(
+    `auctions/${auctionId}/live_state/bid`,
   );
   const { data: auctionData } = useRealtimeData(`auctions/${auctionId}`);
 
@@ -89,7 +92,7 @@ export const ProjectorScreen = () => {
     };
   }, [currentPlayer?.stats]);
 
-  const liveBid = liveState?.currentBid ?? 0;
+  const liveBid = Number(liveBidData ?? liveState?.bid ?? liveState?.currentBid ?? 0);
   const isPaused = liveState?.isPaused ?? false;
   const isComplete = liveState?.isComplete ?? false;
 

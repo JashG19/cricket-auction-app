@@ -27,7 +27,7 @@ import {
   formatCurrency,
   getRiskColorClass,
 } from "../../utils/strategyInsights";
-import { verifyPin } from "../../utils/securityUtils";
+import { LiveBidAmount } from "../../components/LiveBidAmount";
 
 // Tab definitions
 const TABS = [
@@ -49,6 +49,7 @@ export const TeamOwnerView = () => {
   const [allPlayersSearch, setAllPlayersSearch] = useState("");
   const [allPlayersStatus, setAllPlayersStatus] = useState("all");
   const [allPlayersGroup, setAllPlayersGroup] = useState("all");
+  const [allPlayersQuickFilter, setAllPlayersQuickFilter] = useState("all");
 
   // Wishlist filter state
   const [wishlistFilter, setWishlistFilter] = useState("all");
@@ -97,8 +98,14 @@ export const TeamOwnerView = () => {
     `auctions/${auctionId}/teams`,
   );
   const { data: groupsData } = useRealtimeData(`auctions/${auctionId}/groups`);
-  const { data: liveState } = useRealtimeData(
-    `auctions/${auctionId}/live_state`,
+  const { data: liveCurrentPlayerId } = useRealtimeData(
+    `auctions/${auctionId}/live_state/currentPlayerId`,
+  );
+  const { data: liveIsPaused } = useRealtimeData(
+    `auctions/${auctionId}/live_state/isPaused`,
+  );
+  const { data: liveIsComplete } = useRealtimeData(
+    `auctions/${auctionId}/live_state/isComplete`,
   );
   const { data: auctionData } = useRealtimeData(`auctions/${auctionId}`);
 
@@ -183,12 +190,20 @@ export const TeamOwnerView = () => {
   }, [authenticated, playersList, teamsList, teamsById, groupsById, teamId]);
 
   // Resolve current live player
-  const currentLivePlayer = liveState?.currentPlayerId
-    ? playersById.get(String(liveState.currentPlayerId))
-    : null;
+  const currentLivePlayer =
+    liveCurrentPlayerId !== null && liveCurrentPlayerId !== undefined
+      ? playersById.get(String(liveCurrentPlayerId))
+      : null;
   const currentLiveGroup = currentLivePlayer
     ? groupsById.get(String(currentLivePlayer.group_id))
     : null;
+  const currentLiveGroupId = currentLiveGroup?.id ?? null;
+  const isAuctionPaused = liveIsPaused ?? false;
+  const isAuctionComplete = liveIsComplete ?? false;
+  const settledBidForStrategy =
+    currentLivePlayer?.soldTo && currentLivePlayer?.soldPrice
+      ? Number(currentLivePlayer.soldPrice) || 0
+      : 0;
 
   // Get squad details
   const squad = useMemo(() => {
@@ -237,7 +252,7 @@ export const TeamOwnerView = () => {
       groupsList,
       currentLivePlayer, // currentPlayer
       currentLiveGroup, // currentGroup (object with group_name)
-      liveState?.currentBid || 0, // currentBid
+      settledBidForStrategy, // Recompute on settled sale state, not each live increment
       [], // teamsList (empty - not needed for single team view)
       groupRules,
       totalPlayersPerTeam,
@@ -249,7 +264,7 @@ export const TeamOwnerView = () => {
     groupsList,
     currentLivePlayer,
     currentLiveGroup,
-    liveState?.currentBid,
+    settledBidForStrategy,
     groupRules,
     totalPlayersPerTeam,
   ]);
@@ -288,6 +303,21 @@ export const TeamOwnerView = () => {
   const filteredAllPlayers = useMemo(() => {
     let list = playersList;
 
+    // Quick filters for mobile-first fast switching
+    if (allPlayersQuickFilter === "myTargets") {
+      list = list.filter(
+        (p) => wishlistSet.has(String(p.id)) && !p.soldTo,
+      );
+    } else if (
+      allPlayersQuickFilter === "currentGroup" &&
+      currentLiveGroupId !== null &&
+      currentLiveGroupId !== undefined
+    ) {
+      list = list.filter(
+        (p) => String(p.group_id) === String(currentLiveGroupId),
+      );
+    }
+
     // Status filter
     if (allPlayersStatus !== "all") {
       list = list.filter((p) => getPlayerStatus(p) === allPlayersStatus);
@@ -307,7 +337,47 @@ export const TeamOwnerView = () => {
     }
 
     return list;
-  }, [playersList, allPlayersStatus, allPlayersGroup, allPlayersSearch]);
+  }, [
+    playersList,
+    allPlayersQuickFilter,
+    allPlayersStatus,
+    allPlayersGroup,
+    allPlayersSearch,
+    wishlistSet,
+    currentLiveGroupId,
+  ]);
+
+  const handleAllPlayersQuickFilter = (filterKey) => {
+    setAllPlayersQuickFilter(filterKey);
+    setAllPlayersSearch("");
+
+    if (filterKey === "all") {
+      setAllPlayersStatus("all");
+      setAllPlayersGroup("all");
+      return;
+    }
+
+    if (filterKey === "unsold") {
+      setAllPlayersStatus("unsold");
+      setAllPlayersGroup("all");
+      return;
+    }
+
+    if (filterKey === "myTargets") {
+      setAllPlayersStatus("all");
+      setAllPlayersGroup("all");
+      return;
+    }
+
+    if (filterKey === "currentGroup") {
+      setAllPlayersStatus("all");
+      setAllPlayersGroup(
+        currentLiveGroupId !== null && currentLiveGroupId !== undefined
+          ? String(currentLiveGroupId)
+          : "all",
+      );
+    }
+  };
 
   const updateWishlist = (updater) => {
     setWishlistIds((prevIds) => {
@@ -341,19 +411,11 @@ export const TeamOwnerView = () => {
   };
 
   // PIN validation
-  const handlePinSubmit = async (e) => {
+  const handlePinSubmit = (e) => {
     e.preventDefault();
     if (!teamData) return;
 
-    let isValidPin = false;
-    if (teamData.pin_hash) {
-      isValidPin = await verifyPin(pinInput, teamData.pin_hash);
-    } else if (teamData.pin) {
-      // Backward compatibility for old teams before hashed PIN migration.
-      isValidPin = String(pinInput) === String(teamData.pin);
-    }
-
-    if (isValidPin) {
+    if (String(pinInput) === String(teamData.pin)) {
       setAuthenticated(true);
       setPinError("");
       localStorage.setItem(`team_pin_${auctionId}_${teamId}`, "true");
@@ -510,12 +572,12 @@ export const TeamOwnerView = () => {
         </div>
 
         {/* Live Auction Status */}
-        {liveState && !liveState.isComplete && currentLivePlayer && (
+        {!isAuctionComplete && currentLivePlayer && (
           <div className="card mb-6 border-2 border-secondary">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-3 h-3 bg-success rounded-full animate-pulse"></div>
               <h2 className="text-lg font-bold text-primary">Live Auction</h2>
-              {liveState.isPaused && (
+              {isAuctionPaused && (
                 <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full font-bold">
                   PAUSED
                 </span>
@@ -534,14 +596,18 @@ export const TeamOwnerView = () => {
               <div className="text-right">
                 <p className="text-xs text-textLight">Current Bid</p>
                 <p className="text-2xl sm:text-3xl font-bold text-secondary animate-pulse-bid">
-                  ₹{(liveState.currentBid || 0).toLocaleString()}
+                  <LiveBidAmount
+                    auctionId={auctionId}
+                    sold={Boolean(currentLivePlayer?.soldTo)}
+                    soldPrice={currentLivePlayer?.soldPrice || 0}
+                  />
                 </p>
               </div>
             </div>
           </div>
         )}
 
-        {liveState?.isComplete && (
+        {isAuctionComplete && (
           <div className="card mb-6 bg-green-50 border-2 border-success text-center p-4">
             <p className="text-lg font-bold text-success">Auction Complete!</p>
           </div>
@@ -743,7 +809,7 @@ export const TeamOwnerView = () => {
         {/* ---- Strategy Tab ---- */}
         {activeTab === "strategy" && (
           <div className="animate-fade-in-up">
-            {teamInsights && !liveState?.isComplete ? (
+            {teamInsights && !isAuctionComplete ? (
               <div className="card">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-bold text-primary">
@@ -864,7 +930,7 @@ export const TeamOwnerView = () => {
                     </div>
                   )}
               </div>
-            ) : liveState?.isComplete ? (
+            ) : isAuctionComplete ? (
               <div className="card text-center py-12">
                 <IoCheckmarkCircle size={48} className="text-success mx-auto mb-3" />
                 <p className="text-lg font-bold text-primary mb-1">
@@ -1048,6 +1114,44 @@ export const TeamOwnerView = () => {
               <h2 className="text-xl sm:text-2xl font-bold text-primary mb-4">
                 All Players ({filteredAllPlayers.length})
               </h2>
+
+              {/* Quick Filters */}
+              <div className="mb-4 -mx-1 px-1 overflow-x-auto">
+                <div className="flex items-center gap-2 min-w-max">
+                  {[
+                    { key: "all", label: "All" },
+                    { key: "unsold", label: "Unsold" },
+                    { key: "myTargets", label: "My Targets" },
+                    { key: "currentGroup", label: "Current Group" },
+                  ].map((chip) => {
+                    const isActive = allPlayersQuickFilter === chip.key;
+                    const isDisabled =
+                      chip.key === "currentGroup" &&
+                      (currentLiveGroupId === null ||
+                        currentLiveGroupId === undefined);
+
+                    return (
+                      <button
+                        key={chip.key}
+                        type="button"
+                        onClick={() => handleAllPlayersQuickFilter(chip.key)}
+                        disabled={isDisabled}
+                        className={`px-3 py-1.5 rounded-full text-xs sm:text-sm font-semibold border transition whitespace-nowrap ${
+                          isActive
+                            ? "bg-primary text-white border-primary"
+                            : "bg-white text-textLight border-border hover:border-primary/40 hover:text-primary"
+                        } ${
+                          isDisabled
+                            ? "opacity-50 cursor-not-allowed hover:border-border hover:text-textLight"
+                            : ""
+                        }`}
+                      >
+                        {chip.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               {/* Search & Filters */}
               <div className="flex flex-col sm:flex-row gap-3 mb-4">

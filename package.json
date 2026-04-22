@@ -9,8 +9,7 @@
     "lint": "eslint src --ext js,jsx",
     "test": "vitest",
     "test:run": "vitest run",
-    "admin:grant": "node scripts/grant-admin-role.mjs",
-    "pins:migrate": "node scripts/migrate-team-pins.mjs"
+    "admin:grant": "node scripts/grant-admin-role.mjs"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.4",

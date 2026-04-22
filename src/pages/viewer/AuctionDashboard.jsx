@@ -10,8 +10,8 @@ import {
 } from "../../utils/dataTransformUtils";
 import { ROUTES } from "../../constants/routes";
 import { IoArrowBack, IoClose } from "react-icons/io5";
-import { AnimatedNumber } from "../../components/AnimatedNumber";
-import pcLogo from "/PCL_Logo.png";
+import { LiveBidAmount } from "../../components/LiveBidAmount";
+import pcLogo from "/images/PCL Logo.png";
 
 export const AuctionDashboard = () => {
   const { auctionId } = useParams();
@@ -30,8 +30,14 @@ export const AuctionDashboard = () => {
   );
   const { data: teamsData } = useRealtimeData(`auctions/${auctionId}/teams`);
   const { data: groupsData } = useRealtimeData(`auctions/${auctionId}/groups`);
-  const { data: liveState } = useRealtimeData(
-    `auctions/${auctionId}/live_state`,
+  const { data: liveCurrentPlayerId } = useRealtimeData(
+    `auctions/${auctionId}/live_state/currentPlayerId`,
+  );
+  const { data: liveIsPaused } = useRealtimeData(
+    `auctions/${auctionId}/live_state/isPaused`,
+  );
+  const { data: liveIsComplete } = useRealtimeData(
+    `auctions/${auctionId}/live_state/isComplete`,
   );
 
   // Transform data with memoization
@@ -53,15 +59,15 @@ export const AuctionDashboard = () => {
 
   // Get current player from admin's live_state (synced via Firebase)
   const currentPlayer = useMemo(() => {
-    if (liveState?.currentPlayerId) {
+    if (liveCurrentPlayerId !== null && liveCurrentPlayerId !== undefined) {
       return (
         playersList.find(
-          (p) => String(p.id) === String(liveState.currentPlayerId),
+          (p) => String(p.id) === String(liveCurrentPlayerId),
         ) || null
       );
     }
     return null;
-  }, [liveState?.currentPlayerId, playersList]);
+  }, [liveCurrentPlayerId, playersList]);
 
   const currentGroup = currentPlayer
     ? groupsById.get(String(currentPlayer.group_id))
@@ -71,9 +77,12 @@ export const AuctionDashboard = () => {
     : null;
 
   // Live bid from admin's real-time state
-  const liveBid = liveState?.currentBid ?? 0;
-  const isAuctionPaused = liveState?.isPaused ?? false;
-  const isAuctionComplete = liveState?.isComplete ?? false;
+  const isAuctionPaused = liveIsPaused ?? false;
+  const isAuctionComplete = liveIsComplete ?? false;
+  const hasLiveState =
+    (liveCurrentPlayerId !== null && liveCurrentPlayerId !== undefined) ||
+    isAuctionPaused ||
+    isAuctionComplete;
 
   const currentPlayerStats = useMemo(() => {
     const stats = currentPlayer?.stats;
@@ -283,7 +292,7 @@ export const AuctionDashboard = () => {
                 <p className="text-textLight">
                   {isAuctionComplete
                     ? "Auction is complete!"
-                    : !liveState
+                    : !hasLiveState
                       ? "Waiting for auction to start..."
                       : "No players available"}
                 </p>
@@ -302,12 +311,11 @@ export const AuctionDashboard = () => {
                     : "Current Bid"}
               </p>
               <div className="mb-4 sm:mb-6 animate-pulse-bid">
-                <AnimatedNumber
-                  value={
-                    currentPlayer?.soldTo
-                      ? currentPlayer.soldPrice || 0
-                      : liveBid
-                  }
+                <LiveBidAmount
+                  auctionId={auctionId}
+                  sold={Boolean(currentPlayer?.soldTo)}
+                  soldPrice={currentPlayer?.soldPrice || 0}
+                  animated
                   className="text-4xl sm:text-6xl font-bold text-secondary"
                 />
               </div>

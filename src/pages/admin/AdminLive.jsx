@@ -413,7 +413,18 @@ export const AdminLive = () => {
     return -1;
   };
 
-  // Sync live state to Firebase so viewers can see current player & bid in real-time
+  // Sync live bid to a lightweight path for high-frequency updates.
+  useEffect(() => {
+    if (!auctionId || sortedPlayers.length === 0) return;
+    const liveStateRef = ref(db, `auctions/${auctionId}/live_state`);
+    update(liveStateRef, {
+      bid: currentBid,
+      currentBid, // Keep legacy field in sync for older clients.
+      bidUpdatedAt: new Date().toISOString(),
+    });
+  }, [auctionId, currentBid, sortedPlayers.length]);
+
+  // Sync heavier live metadata separately (lower update frequency).
   useEffect(() => {
     if (!auctionId || sortedPlayers.length === 0) return;
     const liveStateRef = ref(db, `auctions/${auctionId}/live_state`);
@@ -425,7 +436,6 @@ export const AdminLive = () => {
 
     update(liveStateRef, {
       currentPlayerId: currentPlayer?.id || null,
-      currentBid: currentBid,
       isPaused: auctionPaused,
       isComplete: isAuctionComplete,
       auctionPhase: auctionPhase,
@@ -438,7 +448,6 @@ export const AdminLive = () => {
   }, [
     auctionId,
     currentPlayer?.id,
-    currentBid,
     auctionPaused,
     isAuctionComplete,
     auctionPhase,

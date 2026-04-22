@@ -189,35 +189,31 @@ export const useAuctionTemplate = () => {
    */
   const applyTemplate = useCallback((template) => {
     const auctionData = {
-      purseSize: Number(template.auction_settings?.purse_size || 0),
-      maxPlayers: Number(template.auction_settings?.total_players || 0),
-      maxPlayersPerTeam: Number(
-        template.auction_settings?.max_players_per_team || 11,
-      ),
+      purseSize: template.auction_settings?.purse_size || 0,
+      maxPlayers: template.auction_settings?.total_players || 0,
+      maxPlayersPerTeam: template.auction_settings?.max_players_per_team || 11,
       auctionMode:
         template.auction_settings?.auction_mode || "open_after_aplus",
     };
 
     const teams = (template.team_template || []).map((team, index) => ({
       id: `template_team_${index}`,
-      team_name: team.team_name || team.teamName || "",
-      owner_name: team.owner_name || team.ownerName || "",
-      budget_total: Number(
-        team.budget_total || team.budgetTotal || auctionData.purseSize || 0,
-      ),
-      team_logo: team.team_logo || team.teamLogo || "",
-      pin: "",
+      teamName: team.team_name || "",
+      ownerName: team.owner_name || "",
+      budgetTotal: team.budget_total || auctionData.purseSize,
+      teamLogo: team.team_logo || "",
+      pin: "", // Users must set their own pins
     }));
 
     const groups = (template.group_template || []).map((group, index) => ({
       id: `template_group_${index}`,
-      group_name: group.group_name || group.groupName || "",
-      base_price: Number(group.base_price || group.basePrice || 0),
-      increment_value: Number(group.increment_value || group.incrementValue || 0),
-      max_bid_cap: group.max_bid_cap || group.maxBidCap || "",
-      min_per_team: Number(group.min_per_team || group.minPerTeam || 0),
-      max_per_team: Number(group.max_per_team || group.maxPerTeam || 0),
-      order: Number(group.order || index + 1),
+      groupName: group.group_name || "",
+      basePrice: group.base_price || 0,
+      incrementValue: group.increment_value || 0,
+      maxBidCap: group.max_bid_cap || "",
+      minPerTeam: group.min_per_team || 0,
+      maxPerTeam: group.max_per_team || 0,
+      order: group.order || index + 1,
     }));
 
     return { auctionData, teams, groups };
