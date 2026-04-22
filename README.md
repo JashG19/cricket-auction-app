@@ -242,6 +242,13 @@ Configure Firestore rules to:
 
 2. **Import in Vercel** and connect your GitHub repo
 
+### Google Search Console Sitemap
+
+1. Update `public/sitemap.xml` and replace `https://your-domain.com` with your production domain.
+2. Keep `public/robots.txt` in place (it already references `/sitemap.xml`).
+3. Deploy the app.
+4. In Google Search Console, submit `https://<your-domain>/sitemap.xml`.
+
 ## Testing
 
 ### Manual Test Checklist
