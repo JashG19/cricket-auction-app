@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuction } from "../../hooks/useAuction";
 import { useRealtimeData } from "../../hooks/useRealtimeData";
@@ -142,6 +142,8 @@ export const AdminPlayers = () => {
     sourceGroup: UNASSIGNED_GROUP_ID,
     targetGroup: "",
   });
+  const [segregationSelectedIds, setSegregationSelectedIds] = useState([]);
+  const [segregationSearch, setSegregationSearch] = useState("");
   const [showSaleModal, setShowSaleModal] = useState(false);
   const [salePlayer, setSalePlayer] = useState(null);
   const [saleForm, setSaleForm] = useState({ soldTo: "", soldPrice: "" });
@@ -149,6 +151,10 @@ export const AdminPlayers = () => {
   const playersList = firebaseObjectToArray(playersData);
   const groupsList = firebaseObjectToArray(groupsData);
   const teamsList = firebaseObjectToArray(teamsData);
+  const groupsById = useMemo(
+    () => new Map(groupsList.map((group) => [String(group.id), group])),
+    [groupsList],
+  );
 
   // Filter players by selected group and status
   const filteredPlayers = useMemo(() => {
@@ -188,14 +194,54 @@ export const AdminPlayers = () => {
   const unassignedPlayersCount = groupCounts.get(UNASSIGNED_GROUP_ID) || 0;
 
   const segregationCandidates = useMemo(() => {
-    if (segregationForm.sourceGroup === "all") return playersList;
-    if (segregationForm.sourceGroup === UNASSIGNED_GROUP_ID) {
-      return playersList.filter((p) => !p.group_id);
-    }
-    return playersList.filter(
-      (p) => String(p.group_id) === String(segregationForm.sourceGroup),
-    );
+    const sourceCandidates =
+      segregationForm.sourceGroup === "all"
+        ? playersList
+        : segregationForm.sourceGroup === UNASSIGNED_GROUP_ID
+          ? playersList.filter((p) => !p.group_id)
+          : playersList.filter(
+              (p) => String(p.group_id) === String(segregationForm.sourceGroup),
+            );
+
+    // Sold players are locked after auctioning and cannot be re-grouped.
+    return sourceCandidates.filter((p) => !p.soldTo);
   }, [playersList, segregationForm.sourceGroup]);
+  const segregationFilteredCandidates = useMemo(() => {
+    const query = segregationSearch.trim().toLowerCase();
+    if (!query) return segregationCandidates;
+    return segregationCandidates.filter((player) =>
+      String(player.player_name || "").toLowerCase().includes(query),
+    );
+  }, [segregationCandidates, segregationSearch]);
+  const segregationSelectedIdSet = useMemo(
+    () => new Set(segregationSelectedIds.map((id) => String(id))),
+    [segregationSelectedIds],
+  );
+  const selectedSegregationPlayers = useMemo(
+    () =>
+      segregationCandidates.filter((player) =>
+        segregationSelectedIdSet.has(String(player.id)),
+      ),
+    [segregationCandidates, segregationSelectedIdSet],
+  );
+  const allFilteredSelected = useMemo(
+    () =>
+      segregationFilteredCandidates.length > 0 &&
+      segregationFilteredCandidates.every((player) =>
+        segregationSelectedIdSet.has(String(player.id)),
+      ),
+    [segregationFilteredCandidates, segregationSelectedIdSet],
+  );
+
+  useEffect(() => {
+    const candidateIds = new Set(
+      segregationCandidates.map((player) => String(player.id)),
+    );
+    setSegregationSelectedIds((prev) => {
+      const filtered = prev.filter((id) => candidateIds.has(String(id)));
+      return filtered.length === prev.length ? prev : filtered;
+    });
+  }, [segregationCandidates]);
 
   // Open add modal
   const openAddModal = () => {
@@ -770,6 +816,38 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
     showToast("Template downloaded!", "success");
   };
 
+  const handleToggleSegregationPlayer = (playerId) => {
+    const normalizedId = String(playerId);
+    setSegregationSelectedIds((prev) => {
+      const exists = prev.some((id) => String(id) === normalizedId);
+      if (exists) {
+        return prev.filter((id) => String(id) !== normalizedId);
+      }
+      return [...prev, normalizedId];
+    });
+  };
+
+  const handleToggleSelectAllFiltered = () => {
+    setSegregationSelectedIds((prev) => {
+      const next = new Set(prev.map((id) => String(id)));
+      if (allFilteredSelected) {
+        segregationFilteredCandidates.forEach((player) => {
+          next.delete(String(player.id));
+        });
+      } else {
+        segregationFilteredCandidates.forEach((player) => {
+          next.add(String(player.id));
+        });
+      }
+      return Array.from(next);
+    });
+  };
+
+  const resetSegregationState = () => {
+    setSegregationSelectedIds([]);
+    setSegregationSearch("");
+  };
+
   const handleApplySegregation = async () => {
     if (!segregationForm.targetGroup) {
       showToast("Select the target group", "error");
@@ -781,12 +859,17 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
       return;
     }
 
-    const candidates = segregationCandidates.filter(
+    if (selectedSegregationPlayers.length === 0) {
+      showToast("Select at least one player to move", "error");
+      return;
+    }
+
+    const candidates = selectedSegregationPlayers.filter(
       (player) => String(player.group_id || "") !== String(segregationForm.targetGroup),
     );
 
     if (candidates.length === 0) {
-      showToast("No players to move for this selection", "error");
+      showToast("Selected players are already in the target group", "error");
       return;
     }
 
@@ -803,7 +886,7 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
         `${candidates.length} player(s) moved to ${targetGroupName}`,
         "success",
       );
-      setShowSegregationModal(false);
+      setSegregationSelectedIds([]);
     } catch (error) {
       showToast("Failed to segregate players: " + error.message, "error");
     }
@@ -958,11 +1041,11 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
               {playersList.length > 0 && groupsList.length > 0 && (
                 <button
                   onClick={() => {
-                    setSegregationForm((prev) => ({
-                      ...prev,
+                    setSegregationForm({
                       sourceGroup: UNASSIGNED_GROUP_ID,
                       targetGroup: groupsList[0]?.id || "",
-                    }));
+                    });
+                    resetSegregationState();
                     setShowSegregationModal(true);
                   }}
                   className="btn btn-sm btn-secondary flex items-center gap-1"
@@ -1317,61 +1400,147 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
         <Modal
           isOpen={showSegregationModal}
           title="Segregate Players into Groups"
-          onClose={() => setShowSegregationModal(false)}
+          onClose={() => {
+            setShowSegregationModal(false);
+            resetSegregationState();
+          }}
           onConfirm={handleApplySegregation}
-          confirmText="Apply Segregation"
+          confirmText={`Move Selected (${segregationSelectedIds.length})`}
         >
           <div className="space-y-4">
-            <div>
-              <label className="block font-semibold text-text mb-2">
-                Move players from
-              </label>
-              <select
-                value={segregationForm.sourceGroup}
-                onChange={(e) =>
-                  setSegregationForm({
-                    ...segregationForm,
-                    sourceGroup: e.target.value,
-                  })
-                }
-                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary"
-              >
-                <option value={UNASSIGNED_GROUP_ID}>Unassigned players</option>
-                <option value="all">All players</option>
-                {groupsList.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.group_name}
-                  </option>
-                ))}
-              </select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block font-semibold text-text mb-2">
+                  Show players from
+                </label>
+                <select
+                  value={segregationForm.sourceGroup}
+                  onChange={(e) => {
+                    setSegregationForm({
+                      ...segregationForm,
+                      sourceGroup: e.target.value,
+                    });
+                    setSegregationSelectedIds([]);
+                  }}
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary"
+                >
+                  <option value={UNASSIGNED_GROUP_ID}>Unassigned players</option>
+                  <option value="all">All players</option>
+                  {groupsList.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.group_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-text mb-2">
+                  Assign selected to
+                </label>
+                <select
+                  value={segregationForm.targetGroup}
+                  onChange={(e) =>
+                    setSegregationForm({
+                      ...segregationForm,
+                      targetGroup: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary"
+                >
+                  <option value="">Select target group</option>
+                  {groupsList.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.group_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div>
               <label className="block font-semibold text-text mb-2">
-                To target group
+                Find players
               </label>
-              <select
-                value={segregationForm.targetGroup}
-                onChange={(e) =>
-                  setSegregationForm({
-                    ...segregationForm,
-                    targetGroup: e.target.value,
-                  })
-                }
+              <input
+                type="text"
+                value={segregationSearch}
+                onChange={(e) => setSegregationSearch(e.target.value)}
+                placeholder="Search by player name"
                 className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:border-primary"
-              >
-                <option value="">Select target group</option>
-                {groupsList.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.group_name}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
-            <p className="text-sm text-textLight">
-              {segregationCandidates.length} player(s) match the selected source.
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <p className="text-sm text-textLight">
+                {segregationSelectedIds.length} selected out of{" "}
+                {segregationFilteredCandidates.length} shown (
+                {segregationCandidates.length} total from source)
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleToggleSelectAllFiltered}
+                  className="btn btn-sm btn-secondary"
+                >
+                  {allFilteredSelected ? "Unselect Shown" : "Select All Shown"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSegregationSelectedIds([])}
+                  className="btn btn-sm btn-secondary"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+            <p className="text-xs text-textLight">
+              Note: Sold players are excluded from segregation.
             </p>
+
+            <div className="max-h-64 overflow-y-auto border border-border rounded-lg">
+              {segregationFilteredCandidates.length === 0 ? (
+                <p className="text-sm text-textLight p-4">
+                  No players found for the selected source/search.
+                </p>
+              ) : (
+                segregationFilteredCandidates.map((player) => {
+                  const currentGroup = player.group_id
+                    ? groupsById.get(String(player.group_id))
+                    : null;
+                  const isSelected = segregationSelectedIdSet.has(String(player.id));
+                  return (
+                    <label
+                      key={player.id}
+                      className="flex items-center justify-between gap-3 p-3 border-b border-border last:border-b-0 hover:bg-lightBg cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleSegregationPlayer(player.id)}
+                          className="h-4 w-4"
+                        />
+                        <div className="min-w-0">
+                          <p className="font-semibold text-text truncate">
+                            {player.player_name}
+                          </p>
+                          <p className="text-xs text-textLight">
+                            Age: {player.age || "N/A"} | Current:{" "}
+                            {currentGroup?.group_name || "Unassigned"}
+                          </p>
+                        </div>
+                      </div>
+                      {player.soldTo && (
+                        <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 font-semibold">
+                          SOLD
+                        </span>
+                      )}
+                    </label>
+                  );
+                })
+              )}
+            </div>
           </div>
         </Modal>
 

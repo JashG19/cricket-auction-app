@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useRealtimeData } from "../../hooks/useRealtimeData";
 import { useToast } from "../../components/Toast";
@@ -8,6 +8,7 @@ import {
   exportToCSV,
   exportToExcel,
   exportToPDF,
+  warmExportDeps,
 } from "../../utils/exportUtils";
 import {
   firebaseObjectToArray,
@@ -20,6 +21,7 @@ export const AdminResults = () => {
   const { auctionId } = useParams();
   const navigate = useNavigate();
   const { toasts, showToast, removeToast } = useToast();
+  const [exportingType, setExportingType] = useState(null);
 
   const { data: auctionData } = useRealtimeData(`auctions/${auctionId}`);
   const { data: playersData } = useRealtimeData(
@@ -71,7 +73,8 @@ export const AdminResults = () => {
   );
 
   // Export functions
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
+    setExportingType("csv");
     try {
       exportToCSV(
         teamsList,
@@ -81,12 +84,15 @@ export const AdminResults = () => {
       showToast("CSV exported successfully!", "success");
     } catch (error) {
       showToast(`Error exporting CSV: ${error.message}`, "error");
+    } finally {
+      setExportingType(null);
     }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    setExportingType("excel");
     try {
-      exportToExcel(
+      await exportToExcel(
         teamsList,
         playersWithGroup,
         `${auctionData?.name || "auction"}_results.xlsx`,
@@ -94,12 +100,15 @@ export const AdminResults = () => {
       showToast("Excel exported successfully!", "success");
     } catch (error) {
       showToast(`Error exporting Excel: ${error.message}`, "error");
+    } finally {
+      setExportingType(null);
     }
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
+    setExportingType("pdf");
     try {
-      exportToPDF(
+      await exportToPDF(
         auctionData,
         teamsList,
         playersWithGroup,
@@ -108,6 +117,8 @@ export const AdminResults = () => {
       showToast("PDF exported successfully!", "success");
     } catch (error) {
       showToast(`Error exporting PDF: ${error.message}`, "error");
+    } finally {
+      setExportingType(null);
     }
   };
 
@@ -191,21 +202,35 @@ export const AdminResults = () => {
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <button
                 onClick={handleExportCSV}
+                disabled={exportingType !== null}
                 className="btn btn-primary flex-1 flex items-center justify-center gap-2 btn-lg"
               >
-                <IoDownload size={20} /> Export as CSV
+                <IoDownload size={20} />
+                {exportingType === "csv" ? "Exporting CSV..." : "Export as CSV"}
               </button>
               <button
                 onClick={handleExportExcel}
+                onMouseEnter={() => {
+                  void warmExportDeps("xlsx");
+                }}
+                disabled={exportingType !== null}
                 className="btn btn-secondary flex-1 flex items-center justify-center gap-2 btn-lg"
               >
-                <IoDownload size={20} /> Export as Excel
+                <IoDownload size={20} />
+                {exportingType === "excel"
+                  ? "Loading Excel tools..."
+                  : "Export as Excel"}
               </button>
               <button
                 onClick={handleExportPDF}
+                onMouseEnter={() => {
+                  void warmExportDeps("pdf");
+                }}
+                disabled={exportingType !== null}
                 className="btn btn-danger flex-1 flex items-center justify-center gap-2 btn-lg"
               >
-                <IoDocument size={20} /> Export as PDF
+                <IoDocument size={20} />
+                {exportingType === "pdf" ? "Loading PDF tools..." : "Export as PDF"}
               </button>
             </div>
           </div>

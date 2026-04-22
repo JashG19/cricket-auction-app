@@ -1,7 +1,44 @@
 import Papa from "papaparse";
-import * as XLSX from "xlsx";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+
+let xlsxModulePromise = null;
+let pdfModulesPromise = null;
+
+const loadXlsxModule = async () => {
+  if (!xlsxModulePromise) {
+    xlsxModulePromise = import("xlsx").then((module) => module.default || module);
+  }
+  return xlsxModulePromise;
+};
+
+const loadPdfModules = async () => {
+  if (!pdfModulesPromise) {
+    pdfModulesPromise = Promise.all([
+      import("jspdf"),
+      import("jspdf-autotable"),
+    ]).then(([jspdfModule, autoTableModule]) => ({
+      jsPDF:
+        jspdfModule.jsPDF || jspdfModule.default || jspdfModule,
+      autoTable:
+        autoTableModule.default || autoTableModule.autoTable || autoTableModule,
+    }));
+  }
+  return pdfModulesPromise;
+};
+
+/**
+ * Optional preloader for export-heavy dependencies.
+ */
+export const warmExportDeps = async (target = "all") => {
+  if (target === "xlsx") {
+    await loadXlsxModule();
+    return;
+  }
+  if (target === "pdf") {
+    await loadPdfModules();
+    return;
+  }
+  await Promise.all([loadXlsxModule(), loadPdfModules()]);
+};
 
 /**
  * Export teams and players to CSV
@@ -73,12 +110,13 @@ export const exportToCSV = (
 /**
  * Export to Excel with multiple sheets
  */
-export const exportToExcel = (
+export const exportToExcel = async (
   teams,
   players,
   filename = "auction_results.xlsx",
 ) => {
   try {
+    const XLSX = await loadXlsxModule();
     const workbook = XLSX.utils.book_new();
 
     // Teams sheet
@@ -147,12 +185,13 @@ export const exportToExcel = (
 /**
  * Export team squad in detailed format
  */
-export const exportTeamSquads = (
+export const exportTeamSquads = async (
   teams,
   players,
   filename = "team_squads.xlsx",
 ) => {
   try {
+    const XLSX = await loadXlsxModule();
     const workbook = XLSX.utils.book_new();
 
     teams.forEach((team) => {
@@ -215,8 +254,14 @@ export const generateAuctionSummary = (auctionData, teams, players) => {
 /**
  * Export auction results to PDF
  */
-export const exportToPDF = (auctionData, teams, players, filename = "auction_results.pdf") => {
+export const exportToPDF = async (
+  auctionData,
+  teams,
+  players,
+  filename = "auction_results.pdf",
+) => {
   try {
+    const { jsPDF, autoTable } = await loadPdfModules();
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
 

@@ -114,7 +114,8 @@ export const AdminLive = () => {
 
   // Sort players by group order (groups are in Firebase creation order)
   const sortedPlayers = useMemo(() => {
-    if (playersList.length === 0 || groupsList.length === 0) return [];
+    if (playersList.length === 0) return [];
+    if (groupsList.length === 0) return [...playersList];
     const groupOrderMap = new Map(
       groupsList.map((g, idx) => [String(g.id), idx]),
     );
@@ -124,6 +125,19 @@ export const AdminLive = () => {
       return aIdx - bIdx;
     });
   }, [playersList, groupsList]);
+
+  const playersMissingGroup = useMemo(
+    () => sortedPlayers.filter((player) => !player.group_id),
+    [sortedPlayers],
+  );
+
+  const playersWithInvalidGroup = useMemo(() => {
+    const validGroupIds = new Set(groupsList.map((group) => String(group.id)));
+    return sortedPlayers.filter(
+      (player) =>
+        player.group_id && !validGroupIds.has(String(player.group_id)),
+    );
+  }, [sortedPlayers, groupsList]);
 
   // Current player - use ID-based selection for phase system, fall back to index
   const currentPlayer = useMemo(() => {
@@ -703,6 +717,32 @@ export const AdminLive = () => {
     );
   }
 
+  if (playersMissingGroup.length > 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-lightBg transition-colors">
+        <div className="text-center max-w-lg">
+          <p className="text-xl text-textLight mb-4">
+            Group assignment required before Live
+          </p>
+          <p className="text-textLight mb-4">
+            {playersMissingGroup.length} player(s) are still unassigned to any
+            group.
+          </p>
+          <p className="text-sm text-danger mb-6">
+            Open the Players page, use Segregate, and assign every player to a
+            valid group.
+          </p>
+          <button
+            onClick={() => navigate(ROUTES.ADMIN_PLAYERS(auctionId))}
+            className="btn btn-primary"
+          >
+            Go to Players & Segregate
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // --- AUCTION COMPLETE SCREEN ---
   if (isAuctionComplete) {
     return (
@@ -821,12 +861,16 @@ export const AdminLive = () => {
     );
   }
 
-  // Invalid group fallback
+  // Invalid group fallback (only when current player cannot be resolved to a valid group)
   if (!currentPlayer || !currentGroup) {
-    const validPlayers = sortedPlayers.filter((p) =>
-      groupsList.find((g) => String(g.id) === String(p.group_id)),
+    const invalidIdSet = new Set(playersWithInvalidGroup.map((p) => String(p.id)));
+    const validPlayers = sortedPlayers.filter(
+      (p) => !invalidIdSet.has(String(p.id)),
     );
-    const invalidCount = sortedPlayers.length - validPlayers.length;
+    const invalidCount = playersWithInvalidGroup.length;
+    const currentSortedIndex = sortedPlayers.findIndex(
+      (p) => String(p.id) === String(currentPlayer?.id || currentPlayerId),
+    );
 
     return (
       <div className="min-h-screen flex items-center justify-center bg-lightBg transition-colors">
@@ -835,35 +879,38 @@ export const AdminLive = () => {
             Player has invalid group assignment
           </p>
           <p className="text-textLight mb-4">
-            Player <strong>"{currentPlayer?.player_name}"</strong> (#
-            {currentPlayerIndex + 1}) has a group_id that doesn't match any
-            group.
+            {invalidCount > 0
+              ? "One or more players reference a group_id that does not exist in this auction."
+              : "Could not resolve the current player in the active auction order."}
           </p>
           <p className="text-sm text-danger mb-6">
-            {invalidCount} of {sortedPlayers.length} player(s) have invalid
-            groups. Delete them on the Players page and re-add.
+            {invalidCount > 0
+              ? `${invalidCount} of ${sortedPlayers.length} player(s) have invalid groups. Open Players and use Edit or Segregate to assign valid groups.`
+              : "Try skipping to a valid player, or open Players to repair group assignments."}
           </p>
           <div className="flex gap-4 justify-center flex-wrap">
             {validPlayers.length > 0 && (
               <button
                 onClick={() => {
+                  const startIdx =
+                    currentSortedIndex !== -1
+                      ? currentSortedIndex
+                      : currentPlayerIndex;
                   const nextValidIdx = sortedPlayers.findIndex(
                     (p, idx) =>
-                      idx > currentPlayerIndex &&
-                      groupsList.find(
-                        (g) => String(g.id) === String(p.group_id),
-                      ),
+                      idx > startIdx && !invalidIdSet.has(String(p.id)),
                   );
                   if (nextValidIdx !== -1) {
                     setCurrentPlayerIndex(nextValidIdx);
+                    setCurrentPlayerId(sortedPlayers[nextValidIdx]?.id || null);
                   } else {
-                    const firstValidIdx = sortedPlayers.findIndex((p) =>
-                      groupsList.find(
-                        (g) => String(g.id) === String(p.group_id),
-                      ),
+                    const firstValidIdx = sortedPlayers.findIndex(
+                      (p) => !invalidIdSet.has(String(p.id)),
                     );
-                    if (firstValidIdx !== -1)
+                    if (firstValidIdx !== -1) {
                       setCurrentPlayerIndex(firstValidIdx);
+                      setCurrentPlayerId(sortedPlayers[firstValidIdx]?.id || null);
+                    }
                   }
                 }}
                 className="btn btn-primary"
@@ -871,12 +918,12 @@ export const AdminLive = () => {
                 Skip to Next Valid Player ({validPlayers.length} available)
               </button>
             )}
-            <a
-              href={`/admin/players/${auctionId}`}
+            <button
+              onClick={() => navigate(ROUTES.ADMIN_PLAYERS(auctionId))}
               className="btn btn-secondary"
             >
-              Go to Players Page
-            </a>
+              Go to Players & Fix Groups
+            </button>
           </div>
         </div>
       </div>
