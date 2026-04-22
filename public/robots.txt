@@ -6,4 +6,4 @@ Disallow: /login
 Disallow: /auction/*/team/
 Disallow: /auction/*/projector
 
-Sitemap: /sitemap.xml
+Sitemap: https://jashgandhi-pcl-auction-app.vercel.app/sitemap.xml
