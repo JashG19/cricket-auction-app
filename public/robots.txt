@@ -1,9 +1,5 @@
 User-agent: *
 Allow: /
-
 Disallow: /admin/
-Disallow: /login
-Disallow: /auction/*/team/
-Disallow: /auction/*/projector
 
 Sitemap: https://jashgandhi-pcl-auction-app.vercel.app/sitemap.xml
