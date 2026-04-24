@@ -75,6 +75,11 @@ export const AuctionDashboard = () => {
   const currentTeam = currentPlayer?.soldTo
     ? teamsList.find((t) => String(t.id) === String(currentPlayer.soldTo))
     : null;
+  const currentPlayerPhoto = getImagePath(
+    "player-photo",
+    currentPlayer?.photo_url,
+    currentPlayer?.player_name,
+  );
 
   // Live bid from admin's real-time state
   const isAuctionPaused = liveIsPaused ?? false;
@@ -218,12 +223,9 @@ export const AuctionDashboard = () => {
               <div className="bg-white rounded-lg shadow-lg overflow-hidden card-hover">
                 {/* Hero Player Photo */}
                 <div className="relative w-full h-56 sm:h-72 lg:h-80">
-                  {currentPlayer.photo_url ? (
+                  {currentPlayerPhoto ? (
                     <img
-                      src={getImagePath(
-                        "player-photo",
-                        currentPlayer.photo_url,
-                      )}
+                      src={currentPlayerPhoto}
                       alt={currentPlayer.player_name}
                       className="w-full h-full object-cover"
                       onError={(e) => {

@@ -280,6 +280,11 @@ export const PlayerPool = () => {
               const team = player.soldTo
                 ? teamsById.get(String(player.soldTo))
                 : null;
+              const playerPhoto = getImagePath(
+                "player-photo",
+                player.photo_url,
+                player.player_name,
+              );
 
               return (
                 <div
@@ -292,9 +297,9 @@ export const PlayerPool = () => {
                 >
                   {/* Player Photo with Gradient Overlay */}
                   <div className="relative w-full h-28 sm:h-40 bg-gray-200 overflow-hidden">
-                    {player.photo_url ? (
+                    {playerPhoto ? (
                       <img
-                        src={getImagePath("player-photo", player.photo_url)}
+                        src={playerPhoto}
                         alt={player.player_name}
                         className="w-full h-full object-cover"
                         onError={(e) => {

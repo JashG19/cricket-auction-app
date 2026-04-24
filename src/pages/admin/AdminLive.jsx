@@ -153,6 +153,11 @@ export const AdminLive = () => {
   const currentGroup = currentPlayer
     ? groupsList.find((g) => String(g.id) === String(currentPlayer.group_id))
     : null;
+  const currentPlayerPhoto = getImagePath(
+    "player-photo",
+    currentPlayer?.photo_url,
+    currentPlayer?.player_name,
+  );
 
   // Compute team eligibility for current bid using new auction rules
   const teamEligibility = useMemo(() => {
@@ -1116,12 +1121,9 @@ export const AdminLive = () => {
                     </span>
                   </div>
                   {/* Photo overlay (if exists) */}
-                  {currentPlayer.photo_url && (
+                  {currentPlayerPhoto && (
                     <img
-                      src={getImagePath(
-                        "player-photo",
-                        currentPlayer.photo_url,
-                      )}
+                      src={currentPlayerPhoto}
                       alt={currentPlayer.player_name}
                       className="absolute inset-0 w-full h-full object-cover"
                       onError={(e) => {

@@ -67,6 +67,11 @@ export const ProjectorScreen = () => {
   const currentGroup = currentPlayer
     ? groupsById.get(String(currentPlayer.group_id))
     : null;
+  const currentPlayerPhoto = getImagePath(
+    "player-photo",
+    currentPlayer?.photo_url,
+    currentPlayer?.player_name,
+  );
 
   const currentPlayerStats = useMemo(() => {
     const stats = currentPlayer?.stats;
@@ -114,7 +119,11 @@ export const ProjectorScreen = () => {
     setSoldPopup({
       playerId: currentPlayer.id,
       playerName: currentPlayer.player_name,
-      photoUrl: getImagePath("player-photo", currentPlayer.photo_url),
+      photoUrl: getImagePath(
+        "player-photo",
+        currentPlayer.photo_url,
+        currentPlayer.player_name,
+      ),
       soldPrice: currentPlayer.soldPrice || 0,
       teamName: team.team_name,
       teamLogo: team.team_logo,
@@ -144,7 +153,11 @@ export const ProjectorScreen = () => {
     setSoldPopup({
       playerId: currentPlayer.id,
       playerName: currentPlayer.player_name,
-      photoUrl: getImagePath("player-photo", currentPlayer.photo_url),
+      photoUrl: getImagePath(
+        "player-photo",
+        currentPlayer.photo_url,
+        currentPlayer.player_name,
+      ),
       unsold: true,
     });
 
@@ -309,9 +322,9 @@ export const ProjectorScreen = () => {
                 </span>
               </div>
               {/* Photo overlay (if exists) */}
-              {currentPlayer.photo_url && (
+              {currentPlayerPhoto && (
                 <img
-                  src={getImagePath("player-photo", currentPlayer.photo_url)}
+                  src={currentPlayerPhoto}
                   alt={currentPlayer.player_name}
                   className="absolute inset-0 w-full h-full object-cover"
                   onError={(e) => {

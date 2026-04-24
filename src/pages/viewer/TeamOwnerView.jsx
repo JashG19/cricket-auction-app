@@ -688,6 +688,11 @@ export const TeamOwnerView = () => {
                       {squad.map((player, idx) => {
                         const group = groupsById.get(String(player.group_id));
                         const isWishlisted = wishlistSet.has(String(player.id));
+                        const playerPhoto = getImagePath(
+                          "player-photo",
+                          player.photo_url,
+                          player.player_name,
+                        );
                         return (
                           <tr
                             key={player.id}
@@ -698,12 +703,9 @@ export const TeamOwnerView = () => {
                             </td>
                             <td className="py-3 px-3">
                               <div className="flex items-center gap-2">
-                                {player.photo_url ? (
+                                {playerPhoto ? (
                                   <img
-                                    src={getImagePath(
-                                      "player-photo",
-                                      player.photo_url,
-                                    )}
+                                    src={playerPhoto}
                                     alt={player.player_name}
                                     className="w-8 h-8 rounded-full object-cover"
                                     onError={(e) => {
@@ -1210,6 +1212,11 @@ export const TeamOwnerView = () => {
                       const isWishlisted = wishlistSet.has(String(player.id));
                       const isSoldToMe =
                         player.soldTo && String(player.soldTo) === String(teamId);
+                      const playerPhoto = getImagePath(
+                        "player-photo",
+                        player.photo_url,
+                        player.player_name,
+                      );
                       return (
                         <div
                           key={`all-${player.id}`}
@@ -1219,9 +1226,9 @@ export const TeamOwnerView = () => {
                         >
                           <div className="flex items-center gap-3 min-w-0 flex-1">
                             {/* Player Avatar */}
-                            {player.photo_url ? (
+                            {playerPhoto ? (
                               <img
-                                src={getImagePath("player-photo", player.photo_url)}
+                                src={playerPhoto}
                                 alt={player.player_name}
                                 className="w-10 h-10 rounded-full object-cover flex-shrink-0"
                                 onError={(e) => {

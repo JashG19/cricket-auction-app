@@ -1202,6 +1202,11 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
                       const group = groupsList.find(
                         (g) => String(g.id) === String(player.group_id),
                       );
+                      const playerPhoto = getImagePath(
+                        "player-photo",
+                        player.photo_url,
+                        player.player_name,
+                      );
                       return (
                         <tr
                           key={player.id}
@@ -1218,12 +1223,9 @@ Jasprit Bumrah,30,${exampleGroup},jasprit_bumrah.jpg
                           </td>
                           <td className="py-4 px-4">
                             <div className="flex items-center gap-3">
-                              {player.photo_url && (
+                              {playerPhoto && (
                                 <img
-                                  src={getImagePath(
-                                    "player-photo",
-                                    player.photo_url,
-                                  )}
+                                  src={playerPhoto}
                                   alt={player.player_name}
                                   className="w-8 h-8 rounded-full object-cover"
                                   onError={(e) => {
