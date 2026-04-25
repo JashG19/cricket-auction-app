@@ -68,20 +68,20 @@ export const useAuctionConfig = (auctionId, groupsList = null) => {
     // If we have config data, use it
     if (configData?.groupRules) {
       const normalizedGroupRules = normalizeRulesMap(configData.groupRules);
+      // Always compute totals fresh from the current group rules — never use
+      // the stored values which can be stale if groups were edited after creation.
+      const totalPlayersPerTeam = Object.values(normalizedGroupRules).reduce(
+        (sum, rule) => sum + rule.maxPerTeam,
+        0,
+      );
+      const totalMinReserve = Object.values(normalizedGroupRules).reduce(
+        (sum, rule) => sum + rule.basePrice * rule.minPerTeam,
+        0,
+      );
       return {
         groupRules: normalizedGroupRules,
-        totalPlayersPerTeam:
-          configData.totalPlayersPerTeam ||
-          Object.values(normalizedGroupRules).reduce(
-            (sum, rule) => sum + rule.maxPerTeam,
-            0,
-          ),
-        totalMinReserve:
-          configData.totalMinReserve ||
-          Object.values(normalizedGroupRules).reduce(
-            (sum, rule) => sum + rule.basePrice * rule.minPerTeam,
-            0,
-          ),
+        totalPlayersPerTeam,
+        totalMinReserve,
         groupOrder: (
           configData.groupOrder || Object.keys(normalizedGroupRules)
         ).map((name) => normalizeGroupName(name, normalizedGroupRules)),
