@@ -50,6 +50,7 @@ export const AdminSetup = () => {
     deleteTeam,
     updateAuction,
     saveAuctionConfig,
+    updateAuctionConfigOrder,
   } = useAuction();
   const { toasts, showToast, removeToast } = useToast();
   const [showCreateNew, setShowCreateNew] = useState(false);
@@ -356,11 +357,29 @@ export const AdminSetup = () => {
     }
   };
 
+  // Local group order state for existing auction sequential reordering
+  const [localGroupOrder, setLocalGroupOrder] = useState({});
+  const [draggedGroup, setDraggedGroup] = useState(null);
+
   // Fetch groups for the auction being managed
   const { data: managedGroupsData } = useRealtimeData(
     managingGroupsAuctionId
       ? `auctions/${managingGroupsAuctionId}/groups`
       : null,
+  );
+
+  // Fetch groups for the auction in the settings panel
+  const { data: settingsGroupsData } = useRealtimeData(
+    managingSettingsAuctionId
+      ? `auctions/${managingSettingsAuctionId}/groups`
+      : null,
+  );
+  const settingsGroupsList = useMemo(
+    () =>
+      firebaseObjectToArray(settingsGroupsData).sort(
+        (a, b) => (a.order || 0) - (b.order || 0),
+      ),
+    [settingsGroupsData],
   );
   const managedGroupsList = firebaseObjectToArray(managedGroupsData);
 
@@ -543,6 +562,59 @@ export const AdminSetup = () => {
       );
     } catch (error) {
       showToast("Error updating auction mode: " + error.message, "error");
+    }
+  };
+
+  // Reorder groups for new auction via drag-and-drop (fromId dropped onto toId)
+  const handleReorderNewGroup = (fromId, toId) => {
+    if (fromId === toId) return;
+    const sorted = [...groups].sort((a, b) => a.order - b.order);
+    const fromIdx = sorted.findIndex((g) => g.id === fromId);
+    const toIdx = sorted.findIndex((g) => g.id === toId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    const reordered = [...sorted];
+    const [moved] = reordered.splice(fromIdx, 1);
+    reordered.splice(toIdx, 0, moved);
+    setGroups(reordered.map((g, i) => ({ ...g, order: i + 1 })));
+  };
+
+  // Get the current group order for an existing auction.
+  // Always includes ALL groups from settingsGroupsList — config order takes
+  // precedence for known groups, unknowns are appended at the end.
+  const getExistingGroupOrder = (auction) => {
+    if (localGroupOrder[auction.id]) return localGroupOrder[auction.id];
+    const allNames = settingsGroupsList.map((g) => g.group_name);
+    if (auction.config?.groupOrder) {
+      const missing = allNames.filter(
+        (n) => !auction.config.groupOrder.includes(n),
+      );
+      return [...auction.config.groupOrder, ...missing];
+    }
+    return allNames;
+  };
+
+  // Reorder groups for existing auction via drag-and-drop
+  const handleDragDropReorder = (auctionId, fromName, toName) => {
+    const auction = existingAuctions.find((a) => a.id === auctionId);
+    const currentOrder = getExistingGroupOrder(auction);
+    const fromIdx = currentOrder.indexOf(fromName);
+    const toIdx = currentOrder.indexOf(toName);
+    if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+    const newOrder = [...currentOrder];
+    newOrder.splice(fromIdx, 1);
+    newOrder.splice(toIdx, 0, fromName);
+    setLocalGroupOrder((prev) => ({ ...prev, [auctionId]: newOrder }));
+  };
+
+  // Save group order for existing auction to Firebase
+  const handleSaveGroupOrder = async (auctionId) => {
+    const auction = existingAuctions.find((a) => a.id === auctionId);
+    const order = getExistingGroupOrder(auction);
+    try {
+      await updateAuctionConfigOrder(auctionId, order);
+      showToast("Group sequence saved!", "success");
+    } catch (error) {
+      showToast("Error saving group sequence: " + error.message, "error");
     }
   };
 
@@ -881,6 +953,64 @@ export const AdminSetup = () => {
                                 </p>
                               </label>
                             </div>
+
+                            {/* Group sequence reorder — shown only in sequential mode */}
+                            {auction.auction_mode === "sequential" &&
+                              settingsGroupsList.length > 0 && (
+                                <div className="mt-4 pt-3 border-t border-border">
+                                  <p className="text-sm font-semibold text-text mb-1">
+                                    Auction Sequence
+                                  </p>
+                                  <p className="text-xs text-textLight mb-2">
+                                    Drag groups to reorder, then save.
+                                  </p>
+                                  <div className="space-y-1.5 mb-3">
+                                    {getExistingGroupOrder(auction).map(
+                                      (groupName, idx) => (
+                                        <div
+                                          key={groupName}
+                                          draggable
+                                          onDragStart={() =>
+                                            setDraggedGroup(groupName)
+                                          }
+                                          onDragOver={(e) => e.preventDefault()}
+                                          onDrop={() => {
+                                            handleDragDropReorder(
+                                              auction.id,
+                                              draggedGroup,
+                                              groupName,
+                                            );
+                                            setDraggedGroup(null);
+                                          }}
+                                          className={`flex items-center gap-2 p-2 border rounded-lg cursor-grab active:cursor-grabbing transition-colors ${
+                                            draggedGroup === groupName
+                                              ? "opacity-40 border-primary bg-primary/5"
+                                              : "bg-lightBg border-border hover:border-primary/50"
+                                          }`}
+                                        >
+                                          <span className="text-textLight text-sm select-none">
+                                            ☰
+                                          </span>
+                                          <span className="text-xs text-textLight w-4 text-center">
+                                            {idx + 1}.
+                                          </span>
+                                          <span className="text-sm font-medium text-text">
+                                            {groupName}
+                                          </span>
+                                        </div>
+                                      ),
+                                    )}
+                                  </div>
+                                  <button
+                                    onClick={() =>
+                                      handleSaveGroupOrder(auction.id)
+                                    }
+                                    className="btn btn-primary btn-sm flex items-center gap-1"
+                                  >
+                                    <IoSave size={14} /> Save Sequence
+                                  </button>
+                                </div>
+                              )}
                           </div>
                         </div>
                       </div>
@@ -1271,6 +1401,56 @@ export const AdminSetup = () => {
                         </p>
                       </label>
                     </div>
+
+                    {/* Group sequence reorder — shown only in sequential mode */}
+                    {auctionData.auctionMode === "sequential" &&
+                      groups.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-border">
+                          <p className="text-sm font-semibold text-text mb-2">
+                            Auction Sequence
+                          </p>
+                          <p className="text-xs text-textLight mb-3">
+                            Drag groups to set the auction order (top to
+                            bottom).
+                          </p>
+                          <div className="space-y-2">
+                            {[...groups]
+                              .sort((a, b) => a.order - b.order)
+                              .map((group, idx) => (
+                                <div
+                                  key={group.id}
+                                  draggable
+                                  onDragStart={() =>
+                                    setDraggedGroup(group.id)
+                                  }
+                                  onDragOver={(e) => e.preventDefault()}
+                                  onDrop={() => {
+                                    handleReorderNewGroup(
+                                      draggedGroup,
+                                      group.id,
+                                    );
+                                    setDraggedGroup(null);
+                                  }}
+                                  className={`flex items-center gap-2 p-2 border rounded-lg cursor-grab active:cursor-grabbing transition-colors ${
+                                    draggedGroup === group.id
+                                      ? "opacity-40 border-primary bg-primary/5"
+                                      : "bg-lightBg border-border hover:border-primary/50"
+                                  }`}
+                                >
+                                  <span className="text-textLight text-sm select-none">
+                                    ☰
+                                  </span>
+                                  <span className="text-xs text-textLight w-5 text-center">
+                                    {idx + 1}.
+                                  </span>
+                                  <span className="text-sm font-medium text-text">
+                                    {group.group_name}
+                                  </span>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
                   </div>
                 </div>
               </div>

@@ -258,12 +258,47 @@ export const getFirstGroup = (groups, groupOrder = GROUP_ORDER) => {
 };
 
 /**
- * Get the next player for Phase 1 (first group round)
+ * Get the first TWO groups in order — both are auctioned sequentially in
+ * "Open After A+" mode (A+ first, then A). Phase 2 (random) starts from B+.
+ * @param {Array} groups - All groups
+ * @param {Array} groupOrder - Order of groups (defaults to GROUP_ORDER)
+ * @returns {Array} - Up to two group objects
+ */
+export const getPhase1Groups = (groups, groupOrder = GROUP_ORDER) => {
+  if (!groups || groups.length === 0) return [];
+  const order = Array.isArray(groupOrder) ? groupOrder : GROUP_ORDER;
+  const result = [];
+  for (const groupName of order) {
+    const group = groups.find((g) => {
+      const normalized = g.group_name
+        ?.replace(/^Group\s*/i, "")
+        .trim()
+        .toUpperCase();
+      return normalized === groupName.toUpperCase();
+    });
+    if (group) {
+      result.push(group);
+      if (result.length === 2) break;
+    }
+  }
+  if (result.length === 0) {
+    const sorted = [...groups].sort(
+      (a, b) => (a.order || 999) - (b.order || 999),
+    );
+    return sorted.slice(0, 2);
+  }
+  return result;
+};
+
+/**
+ * Get the next player for Phase 1 (A+ then A, sequentially)
+ * All A+ players are auctioned first, then all A players, then the
+ * unsold re-auction queue for both groups at the end.
  * @param {Array} players - All players
  * @param {Array} groups - All groups
- * @param {Array} unsoldFirstGroupIds - IDs of unsold first-group players for re-auction
+ * @param {Array} unsoldFirstGroupIds - IDs of unsold phase-1 players for re-auction
  * @param {Array} groupOrder - Order of groups (defaults to GROUP_ORDER)
- * @returns {Object|null} - Next first-group player to auction, or null if phase complete
+ * @returns {Object|null} - Next phase-1 player to auction, or null if phase complete
  */
 export const getNextAplusPlayer = (
   players,
@@ -271,28 +306,23 @@ export const getNextAplusPlayer = (
   unsoldFirstGroupIds = [],
   groupOrder = GROUP_ORDER,
 ) => {
-  // Find first group dynamically
-  const firstGroup = getFirstGroup(groups, groupOrder);
-  if (!firstGroup) return null;
+  const phase1Groups = getPhase1Groups(groups, groupOrder);
+  if (phase1Groups.length === 0) return null;
 
-  // Get all first-group players
-  const firstGroupPlayers = players.filter(
-    (p) => String(p.group_id) === String(firstGroup.id),
-  );
+  // Go through A+ then A in order — return first unauctioned player found
+  for (const group of phase1Groups) {
+    const groupPlayers = players.filter(
+      (p) => String(p.group_id) === String(group.id),
+    );
+    const notYetAuctioned = groupPlayers.find((p) => !p.soldTo && !p.unsold);
+    if (notYetAuctioned) return notYetAuctioned;
+  }
 
-  // First, find players not yet auctioned (neither sold nor unsold)
-  const notYetAuctioned = firstGroupPlayers.find((p) => !p.soldTo && !p.unsold);
-  if (notYetAuctioned) return notYetAuctioned;
-
-  // If all auctioned once, check unsold queue for re-auction
-  // But verify the player is still actually unsold (not sold in a previous re-auction)
+  // All phase-1 players have been through once — handle re-auction queue
   if (unsoldFirstGroupIds && unsoldFirstGroupIds.length > 0) {
     for (const unsoldId of unsoldFirstGroupIds) {
       const player = players.find((p) => String(p.id) === String(unsoldId));
-      // Only return if player exists and is still not sold
-      if (player && !player.soldTo) {
-        return player;
-      }
+      if (player && !player.soldTo) return player;
     }
   }
 
@@ -300,46 +330,40 @@ export const getNextAplusPlayer = (
 };
 
 /**
- * Check if Phase 1 (first group round) is complete
+ * Check if Phase 1 (A+ and A) is complete — all their players must be sold.
  * @param {Array} players - All players
  * @param {Array} groups - All groups
  * @param {Array} groupOrder - Order of groups (defaults to GROUP_ORDER)
- * @returns {boolean} - True if all first-group players are sold
+ * @returns {boolean}
  */
 export const isPhase1Complete = (players, groups, groupOrder = GROUP_ORDER) => {
-  const firstGroup = getFirstGroup(groups, groupOrder);
-  if (!firstGroup) return true;
+  const phase1Groups = getPhase1Groups(groups, groupOrder);
+  if (phase1Groups.length === 0) return true;
 
-  const firstGroupPlayers = players.filter(
-    (p) => String(p.group_id) === String(firstGroup.id),
-  );
-
-  // Phase 1 is complete when ALL first-group players have soldTo (not just auctioned)
-  return firstGroupPlayers.every((p) => p.soldTo);
+  return phase1Groups.every((group) => {
+    const groupPlayers = players.filter(
+      (p) => String(p.group_id) === String(group.id),
+    );
+    return groupPlayers.every((p) => p.soldTo);
+  });
 };
 
 /**
- * Get a random player for Phase 2 (excludes first group)
+ * Get a random player for Phase 2 (excludes A+ and A groups)
  * @param {Array} players - All players
  * @param {Array} groups - All groups
  * @param {Array} groupOrder - Order of groups (defaults to GROUP_ORDER)
- * @returns {Object|null} - Random unsold non-first-group player, or null if all sold
+ * @returns {Object|null} - Random unsold non-phase-1 player, or null if all sold
  */
 export const getRandomPlayer = (players, groups, groupOrder = GROUP_ORDER) => {
-  const firstGroup = getFirstGroup(groups, groupOrder);
-  const firstGroupId = firstGroup ? String(firstGroup.id) : null;
+  const phase1Groups = getPhase1Groups(groups, groupOrder);
+  const phase1Ids = new Set(phase1Groups.map((g) => String(g.id)));
 
-  // Get all available non-first-group players (not sold yet, including those marked unsold for re-auction)
   const availablePlayers = players.filter((p) => {
-    const isFirstGroup = firstGroupId && String(p.group_id) === firstGroupId;
-    const isSold = !!p.soldTo;
-    // Available if: not first group, not sold (unsold players can be re-auctioned)
-    return !isFirstGroup && !isSold;
+    return !phase1Ids.has(String(p.group_id)) && !p.soldTo;
   });
 
   if (availablePlayers.length === 0) return null;
-
-  // Random selection
   const randomIndex = Math.floor(Math.random() * availablePlayers.length);
   return availablePlayers[randomIndex];
 };

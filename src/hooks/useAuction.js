@@ -330,6 +330,23 @@ export const useAuction = () => {
     }
   }, []);
 
+  const updateAuctionConfigOrder = useCallback(
+    async (auctionId, groupOrder) => {
+      try {
+        setLoading(true);
+        setError(null);
+        const configRef = ref(db, `auctions/${auctionId}/config`);
+        await update(configRef, { groupOrder });
+      } catch (err) {
+        setError(err.message);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
+
   return {
     auctions,
     loading,
@@ -349,5 +366,6 @@ export const useAuction = () => {
     updateTeam,
     deleteTeam,
     saveAuctionConfig,
+    updateAuctionConfigOrder,
   };
 };

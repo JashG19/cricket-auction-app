@@ -21,6 +21,7 @@ import {
   getSequentialProgress,
   normalizeGroupName,
   getFirstGroup,
+  getPhase1Groups,
   AUCTION_MODES,
 } from "../../utils/auctionUtils";
 import {
@@ -298,11 +299,26 @@ export const AdminLive = () => {
     () => getFirstGroup(groupsList, groupOrder),
     [groupsList, groupOrder],
   );
+  // Both phase-1 groups (A+ and A) — used for unsold queue and display
+  const phase1Groups = useMemo(
+    () => getPhase1Groups(groupsList, groupOrder),
+    [groupsList, groupOrder],
+  );
+  const phase1GroupIds = useMemo(
+    () => new Set(phase1Groups.map((g) => String(g.id))),
+    [phase1Groups],
+  );
   const firstGroupPlayers = firstGroup
     ? sortedPlayers.filter((p) => String(p.group_id) === String(firstGroup.id))
     : [];
   const firstGroupSold = firstGroupPlayers.filter((p) => p.soldTo).length;
   const firstGroupTotal = firstGroupPlayers.length;
+  // Phase-1 progress across both A+ and A
+  const phase1Players = sortedPlayers.filter((p) =>
+    phase1GroupIds.has(String(p.group_id)),
+  );
+  const phase1Sold = phase1Players.filter((p) => p.soldTo).length;
+  const phase1Total = phase1Players.length;
 
   // Group-level progress for the current group
   const currentGroupPlayers = currentGroup
@@ -587,13 +603,15 @@ export const AdminLive = () => {
       play("unsold");
       setForceReauction(false); // Reset force flag
 
-      // Phase 1: Add first-group players to re-auction queue
-      const isFirstGroupPlayer =
-        firstGroup && String(currentPlayer.group_id) === String(firstGroup.id);
-      if (auctionPhase === 1 && isFirstGroupPlayer) {
+      // Phase 1: Add phase-1 group players (A+ and A) to re-auction queue
+      const isPhase1Player = phase1GroupIds.has(String(currentPlayer.group_id));
+      if (auctionPhase === 1 && isPhase1Player) {
         setUnsoldAplusIds((prev) => [...prev, currentPlayer.id]);
+        const playerGroup = phase1Groups.find(
+          (g) => String(g.id) === String(currentPlayer.group_id),
+        );
         showToast(
-          `${firstGroup.group_name} player will be re-auctioned after other ${firstGroup.group_name} players`,
+          `${playerGroup?.group_name || "Player"} will be re-auctioned after all A+ & A players`,
           "warning",
         );
       }
@@ -605,15 +623,11 @@ export const AdminLive = () => {
     }
   };
 
-  // List of unsold players (for the re-auction panel) - exclude first-group during Phase 1
+  // List of unsold players (for the re-auction panel) — exclude phase-1 groups during Phase 1
   const unsoldPlayersList = sortedPlayers.filter((p) => {
     if (!p.unsold || p.soldTo) return false;
-    // During Phase 1, first-group unsold players are handled separately via queue
-    if (
-      auctionPhase === 1 &&
-      firstGroup &&
-      String(p.group_id) === String(firstGroup.id)
-    ) {
+    // During Phase 1, A+ and A unsold players are handled via the re-auction queue
+    if (auctionPhase === 1 && phase1GroupIds.has(String(p.group_id))) {
       return false;
     }
     return true;
@@ -978,10 +992,10 @@ export const AdminLive = () => {
               <p className="text-gray-300 text-[10px] sm:text-xs lg:text-sm">
                 {soldCount} sold, {unsoldCount} unsold, {remainingCount}{" "}
                 remaining
-                {!isSequentialMode && auctionPhase === 1 && firstGroup && (
+                {!isSequentialMode && auctionPhase === 1 && phase1Groups.length > 0 && (
                   <span className="ml-1 sm:ml-2 text-yellow-300">
-                    | {firstGroup.group_name}: {firstGroupSold}/
-                    {firstGroupTotal}
+                    | {phase1Groups.map((g) => g.group_name).join(" & ")}: {phase1Sold}/
+                    {phase1Total}
                     {unsoldAplusIds.length > 0 &&
                       ` (+${unsoldAplusIds.length})`}
                   </span>
