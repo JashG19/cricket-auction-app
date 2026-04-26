@@ -165,7 +165,8 @@ export const AdminLive = () => {
     const maxSquadSize =
       Number(auctionData?.max_players_per_team) || totalPlayersPerTeam || 9;
     const currentGroupName = currentGroup?.group_name || null;
-    const bid = Number(currentBid) || 0;
+    const incrementValue = Number(currentGroup?.increment_value) || 0;
+    const bid = (Number(currentBid) || 0) + incrementValue;
 
     return teamsList.map((team) => {
       // Get team's current group counts
