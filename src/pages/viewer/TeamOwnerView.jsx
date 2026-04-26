@@ -861,7 +861,7 @@ export const TeamOwnerView = () => {
                         {teamInsights.groupOpportunities.map((opp) => (
                           <div
                             key={opp.group}
-                            className={`text-xs px-3 py-2 rounded-lg border ${
+                            className={`text-xs px-3 py-2 rounded-lg border flex items-center gap-2 ${
                               opp.stillNeed > 0
                                 ? "bg-orange-50 border-orange-200 text-orange-800"
                                 : opp.canBuyMore > 0
@@ -869,7 +869,14 @@ export const TeamOwnerView = () => {
                                   : "bg-green-50 border-green-200 text-green-800"
                             }`}
                           >
-                            <span className="font-bold">{opp.group}</span>
+                            <div className="flex flex-col items-start">
+                              <span className="font-bold">{opp.group}</span>
+                              {groupRules[opp.group]?.basePrice > 0 && (
+                                <span className="text-[10px] opacity-70">
+                                  Base ₹{groupRules[opp.group].basePrice.toLocaleString()}
+                                </span>
+                              )}
+                            </div>
                             {opp.stillNeed > 0 ? (
                               <span className="ml-1">
                                 Need {opp.stillNeed} more
