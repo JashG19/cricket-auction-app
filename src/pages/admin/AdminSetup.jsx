@@ -51,6 +51,7 @@ export const AdminSetup = () => {
     updateAuction,
     saveAuctionConfig,
     updateAuctionConfigOrder,
+    duplicateAuction,
   } = useAuction();
   const { toasts, showToast, removeToast } = useToast();
   const [showCreateNew, setShowCreateNew] = useState(false);
@@ -844,6 +845,26 @@ export const AdminSetup = () => {
                         title="Auction settings"
                       >
                         <IoSettings size={16} /> Settings
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await duplicateAuction(auction.id);
+                            showToast(
+                              `"Copy of ${auction.name}" created!`,
+                              "success",
+                            );
+                          } catch (error) {
+                            showToast(
+                              "Failed to duplicate: " + error.message,
+                              "error",
+                            );
+                          }
+                        }}
+                        className="btn btn-sm btn-secondary flex items-center gap-1"
+                        title="Duplicate auction"
+                      >
+                        <IoCopy size={16} /> Duplicate
                       </button>
                     </div>
 
