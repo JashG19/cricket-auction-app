@@ -276,6 +276,72 @@ export const useAuction = () => {
     }
   }, []);
 
+  // Duplicate an existing auction — copies settings, teams, groups, players,
+  // and config as-is. Group IDs in players are remapped to new group IDs.
+  // live_state is excluded. Name is prefixed with "Copy of ".
+  const duplicateAuction = useCallback(async (auctionId) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch full auction data
+      const snapshot = await get(ref(db, `auctions/${auctionId}`));
+      const auctionData = snapshot.val();
+      if (!auctionData) throw new Error("Auction not found");
+
+      const { teams, groups, players, config, live_state, ...settings } =
+        auctionData;
+
+      // Create the new auction
+      const newAuctionRef = push(ref(db, "auctions"));
+      const newId = newAuctionRef.key;
+      await set(newAuctionRef, {
+        ...settings,
+        name: `Copy of ${settings.name}`,
+        createdAt: new Date().toISOString(),
+      });
+
+      // Copy groups and build old-ID → new-ID mapping
+      const groupIdMap = {};
+      if (groups) {
+        for (const [oldId, groupData] of Object.entries(groups)) {
+          const newGroupRef = push(ref(db, `auctions/${newId}/groups`));
+          await set(newGroupRef, groupData);
+          groupIdMap[oldId] = newGroupRef.key;
+        }
+      }
+
+      // Copy teams
+      if (teams) {
+        for (const teamData of Object.values(teams)) {
+          await set(push(ref(db, `auctions/${newId}/teams`)), teamData);
+        }
+      }
+
+      // Copy players — remap group_id to new group ID
+      if (players) {
+        for (const playerData of Object.values(players)) {
+          await set(push(ref(db, `auctions/${newId}/players`)), {
+            ...playerData,
+            group_id: groupIdMap[playerData.group_id] ?? playerData.group_id,
+          });
+        }
+      }
+
+      // Copy config as-is
+      if (config) {
+        await set(ref(db, `auctions/${newId}/config`), config);
+      }
+
+      return newId;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Save auction configuration (group rules, totals, etc.)
   const saveAuctionConfig = useCallback(async (auctionId, groups) => {
     try {
@@ -367,5 +433,6 @@ export const useAuction = () => {
     deleteTeam,
     saveAuctionConfig,
     updateAuctionConfigOrder,
+    duplicateAuction,
   };
 };

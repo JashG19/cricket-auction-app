@@ -45,7 +45,20 @@ export const PlayerPool = () => {
   const groupsById = useMemo(() => createLookupMap(groupsList), [groupsList]);
   const teamsById = useMemo(() => createLookupMap(teamsList), [teamsList]);
 
-  // Filter players
+  // Groups sorted by their order field — used for display ordering
+  const sortedGroups = useMemo(
+    () => [...groupsList].sort((a, b) => (a.order || 0) - (b.order || 0)),
+    [groupsList],
+  );
+
+  // Map groupId → position in sorted group list for fast sorting
+  const groupOrderMap = useMemo(() => {
+    const map = new Map();
+    sortedGroups.forEach((g, idx) => map.set(String(g.id), idx));
+    return map;
+  }, [sortedGroups]);
+
+  // Filter and sort players by group order
   const filteredPlayers = useMemo(() => {
     const getPlayerStatus = (player) => {
       if (player.soldTo) return "sold";
@@ -53,31 +66,40 @@ export const PlayerPool = () => {
       return "pending";
     };
 
-    return playersList.filter((player) => {
-      // Search filter
-      if (
-        searchTerm &&
-        !player.player_name?.toLowerCase().includes(searchTerm.toLowerCase())
-      ) {
-        return false;
-      }
+    return playersList
+      .filter((player) => {
+        // Search filter
+        if (
+          searchTerm &&
+          !player.player_name?.toLowerCase().includes(searchTerm.toLowerCase())
+        ) {
+          return false;
+        }
 
-      // Group filter
-      if (
-        selectedGroup !== "all" &&
-        String(player.group_id) !== String(selectedGroup)
-      ) {
-        return false;
-      }
+        // Group filter
+        if (
+          selectedGroup !== "all" &&
+          String(player.group_id) !== String(selectedGroup)
+        ) {
+          return false;
+        }
 
-      // Status filter
-      if (statusFilter !== "all" && getPlayerStatus(player) !== statusFilter) {
-        return false;
-      }
+        // Status filter
+        if (
+          statusFilter !== "all" &&
+          getPlayerStatus(player) !== statusFilter
+        ) {
+          return false;
+        }
 
-      return true;
-    });
-  }, [playersList, searchTerm, selectedGroup, statusFilter]);
+        return true;
+      })
+      .sort(
+        (a, b) =>
+          (groupOrderMap.get(String(a.group_id)) ?? 999) -
+          (groupOrderMap.get(String(b.group_id)) ?? 999),
+      );
+  }, [playersList, searchTerm, selectedGroup, statusFilter, groupOrderMap]);
 
   // Stats
   const totalPlayers = playersList.length;

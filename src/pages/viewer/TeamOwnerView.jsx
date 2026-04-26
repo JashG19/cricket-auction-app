@@ -53,6 +53,7 @@ export const TeamOwnerView = () => {
 
   // Wishlist filter state
   const [wishlistFilter, setWishlistFilter] = useState("all");
+  const [wishlistGroupFilter, setWishlistGroupFilter] = useState("all");
 
   // Sale notification popup state
   const [saleNotification, setSaleNotification] = useState(null);
@@ -289,15 +290,18 @@ export const TeamOwnerView = () => {
 
   // Wishlist filtered candidates
   const wishlistCandidates = useMemo(() => playersList, [playersList]);
-  const filteredWishlistCandidates = useMemo(
-    () =>
-      wishlistFilter === "all"
-        ? wishlistCandidates
-        : wishlistCandidates.filter(
-            (player) => getPlayerStatus(player) === wishlistFilter,
-          ),
-    [wishlistCandidates, wishlistFilter],
-  );
+  const filteredWishlistCandidates = useMemo(() => {
+    return wishlistCandidates.filter((player) => {
+      if (wishlistFilter !== "all" && getPlayerStatus(player) !== wishlistFilter)
+        return false;
+      if (
+        wishlistGroupFilter !== "all" &&
+        String(player.group_id) !== String(wishlistGroupFilter)
+      )
+        return false;
+      return true;
+    });
+  }, [wishlistCandidates, wishlistFilter, wishlistGroupFilter]);
 
   // All Players tab filtered list
   const filteredAllPlayers = useMemo(() => {
@@ -1037,7 +1041,8 @@ export const TeamOwnerView = () => {
                 <p className="text-sm font-semibold text-text mb-3">
                   Browse players to add to wishlist
                 </p>
-                <div className="mb-3 flex flex-wrap gap-2">
+                {/* Status filters */}
+                <div className="mb-2 flex flex-wrap gap-2">
                   {["all", "pending", "sold", "unsold"].map((filterKey) => (
                     <button
                       key={filterKey}
@@ -1050,6 +1055,34 @@ export const TeamOwnerView = () => {
                       {filterKey.charAt(0).toUpperCase() + filterKey.slice(1)}
                     </button>
                   ))}
+                </div>
+                {/* Group filters */}
+                <div className="mb-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setWishlistGroupFilter("all")}
+                    className={`btn btn-sm ${
+                      wishlistGroupFilter === "all" ? "btn-primary" : "btn-secondary"
+                    }`}
+                  >
+                    All Groups
+                  </button>
+                  {[...groupsList]
+                    .sort((a, b) => (a.order || 0) - (b.order || 0))
+                    .map((group) => (
+                      <button
+                        key={group.id}
+                        type="button"
+                        onClick={() => setWishlistGroupFilter(group.id)}
+                        className={`btn btn-sm ${
+                          wishlistGroupFilter === group.id
+                            ? "btn-primary"
+                            : "btn-secondary"
+                        }`}
+                      >
+                        {group.group_name}
+                      </button>
+                    ))}
                 </div>
 
                 <div className="max-h-72 overflow-y-auto border border-border rounded-lg">

@@ -292,8 +292,9 @@ export const getPhase1Groups = (groups, groupOrder = GROUP_ORDER) => {
 
 /**
  * Get the next player for Phase 1 (A+ then A, sequentially)
- * All A+ players are auctioned first, then all A players, then the
- * unsold re-auction queue for both groups at the end.
+ * Order within Phase 1:
+ *   1. All fresh A+ players → unsold A+ re-auctioned → then move to A
+ *   2. All fresh A players  → unsold A re-auctioned  → Phase 1 done
  * @param {Array} players - All players
  * @param {Array} groups - All groups
  * @param {Array} unsoldFirstGroupIds - IDs of unsold phase-1 players for re-auction
@@ -309,21 +310,29 @@ export const getNextAplusPlayer = (
   const phase1Groups = getPhase1Groups(groups, groupOrder);
   if (phase1Groups.length === 0) return null;
 
-  // Go through A+ then A in order — return first unauctioned player found
   for (const group of phase1Groups) {
     const groupPlayers = players.filter(
       (p) => String(p.group_id) === String(group.id),
     );
-    const notYetAuctioned = groupPlayers.find((p) => !p.soldTo && !p.unsold);
-    if (notYetAuctioned) return notYetAuctioned;
-  }
 
-  // All phase-1 players have been through once — handle re-auction queue
-  if (unsoldFirstGroupIds && unsoldFirstGroupIds.length > 0) {
-    for (const unsoldId of unsoldFirstGroupIds) {
+    // 1. Fresh players in this group — pick randomly (not by list order)
+    const notYetAuctioned = groupPlayers.filter((p) => !p.soldTo && !p.unsold);
+    if (notYetAuctioned.length > 0) {
+      return notYetAuctioned[
+        Math.floor(Math.random() * notYetAuctioned.length)
+      ];
+    }
+
+    // 2. Re-auction unsold players from THIS group before moving to the next
+    const groupUnsoldIds = (unsoldFirstGroupIds || []).filter((id) => {
+      const player = players.find((p) => String(p.id) === String(id));
+      return player && String(player.group_id) === String(group.id);
+    });
+    for (const unsoldId of groupUnsoldIds) {
       const player = players.find((p) => String(p.id) === String(unsoldId));
       if (player && !player.soldTo) return player;
     }
+    // This group fully done — move to next group
   }
 
   return null; // Phase 1 complete
