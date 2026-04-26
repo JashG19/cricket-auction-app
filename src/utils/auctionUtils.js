@@ -315,9 +315,13 @@ export const getNextAplusPlayer = (
       (p) => String(p.group_id) === String(group.id),
     );
 
-    // 1. Fresh players in this group first
-    const notYetAuctioned = groupPlayers.find((p) => !p.soldTo && !p.unsold);
-    if (notYetAuctioned) return notYetAuctioned;
+    // 1. Fresh players in this group — pick randomly (not by list order)
+    const notYetAuctioned = groupPlayers.filter((p) => !p.soldTo && !p.unsold);
+    if (notYetAuctioned.length > 0) {
+      return notYetAuctioned[
+        Math.floor(Math.random() * notYetAuctioned.length)
+      ];
+    }
 
     // 2. Re-auction unsold players from THIS group before moving to the next
     const groupUnsoldIds = (unsoldFirstGroupIds || []).filter((id) => {
